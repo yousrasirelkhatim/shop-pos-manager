@@ -1,0 +1,10 @@
+{
+  "name": "لوحة مدير الكاشير",
+  "short_name": "مدير الكاشير",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f8",
+  "theme_color": "#2b1c33",
+  "lang": "ar",
+  "dir": "rtl"
+}

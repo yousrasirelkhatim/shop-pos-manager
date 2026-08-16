@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <script>
+    (function () {
+      if (!location.hostname.includes('supabase.co')) return;
+      if (!location.pathname.includes('/functions/v1/manager-dashboard')) return;
+      const base = document.createElement('base');
+      base.href = location.origin + '/functions/v1/manager-dashboard/';
+      document.currentScript.after(base);
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#2b1c33">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>متابعة الكاشير</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section id="loginView" class="card login">
+      <div class="logo">📊</div>
+      <h1>لوحة المدير</h1>
+      <p>سجّل الدخول لمتابعة المحل من أي مكان</p>
+      <form id="loginForm">
+        <label>البريد الإلكتروني<input id="email" type="email" autocomplete="username" required></label>
+        <label>كلمة المرور<input id="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">دخول</button>
+      </form>
+      <div id="loginError" class="error"></div>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <header>
+        <div><small>لوحة المدير</small><h1 id="shopName">المحل</h1></div>
+        <button id="logoutButton" class="secondary">خروج</button>
+      </header>
+
+      <div class="stats">
+        <article class="card"><span>مبيعات اليوم</span><strong id="todaySales">—</strong></article>
+        <article class="card"><span>فواتير اليوم</span><strong id="todayCount">—</strong></article>
+        <article class="card"><span>ورديات مفتوحة</span><strong id="openCount">—</strong></article>
+      </div>
+
+      <div class="section-title">
+        <h2>الورديات المفتوحة</h2>
+        <button id="refreshButton" class="secondary">تحديث</button>
+      </div>
+      <div id="shiftList" class="shift-list"></div>
+      <p id="lastRefresh" class="muted"></p>
+    </section>
+  </main>
+
+  <dialog id="closeDialog">
+    <form id="closeForm" method="dialog">
+      <h2>إغلاق الوردية عن بُعد</h2>
+      <p id="closeShiftName"></p>
+      <label>النقدية الفعلية في الدرج (اختياري)
+        <input id="actualCash" type="number" min="0" step="0.01" placeholder="يُترك فارغاً للإغلاق على المتوقع">
+      </label>
+      <label>سبب الإغلاق<input id="closeReason" maxlength="200" placeholder="مثال: نهاية اليوم"></label>
+      <div class="dialog-actions">
+        <button type="button" id="cancelClose" class="secondary">تراجع</button>
+        <button type="submit" class="danger">تأكيد الإغلاق</button>
+      </div>
+      <div id="closeError" class="error"></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

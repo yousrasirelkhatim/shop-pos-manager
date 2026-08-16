@@ -1,0 +1,32 @@
+:root{font-family:"Segoe UI",Tahoma,sans-serif;color:#2b2733;background:#f6f5f8}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh}
+main{width:min(920px,100%);margin:auto;padding:20px}
+.hidden{display:none!important}
+.card{background:#fff;border:1px solid #ece9f0;border-radius:18px;padding:20px;box-shadow:0 8px 28px rgba(43,28,51,.07)}
+.login{max-width:420px;margin:8vh auto;text-align:center}
+.logo{font-size:48px}.login h1{margin:8px 0}.login p,.muted{color:#7d7788}
+form{display:grid;gap:14px;text-align:right}
+label{display:grid;gap:6px;font-weight:650}
+input{width:100%;padding:12px;border:1.5px solid #ded9e4;border-radius:11px;font:inherit}
+input:focus{outline:none;border-color:#e8446a}
+button{border:0;border-radius:11px;padding:11px 16px;background:#12b886;color:white;font:inherit;font-weight:750;cursor:pointer}
+button.secondary{background:#eeeaf1;color:#2b2733}
+button.danger{background:#e03131}
+.error{min-height:20px;color:#e03131;font-weight:650;margin-top:8px}
+header,.section-title{display:flex;justify-content:space-between;align-items:center;gap:12px}
+header h1{margin:2px 0 18px}header small{color:#8a8595}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+.stats article{display:grid;gap:8px}.stats span{color:#8a8595}.stats strong{font-size:28px}
+.section-title h2{font-size:19px}
+.shift-list{display:grid;gap:12px}
+.shift{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px}
+.shift h3{margin:0 0 5px}.shift p{margin:3px 0;color:#777181}
+.shift .expected{font-weight:800;color:#0ca678}
+dialog{width:min(430px,calc(100% - 24px));border:0;border-radius:18px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(43,28,51,.55)}
+.dialog-actions{display:flex;gap:10px}.dialog-actions button{flex:1}
+@media(max-width:650px){
+  main{padding:14px}.stats{grid-template-columns:1fr}.stats article{grid-template-columns:1fr auto;align-items:center}
+  .stats strong{font-size:23px}.shift{grid-template-columns:1fr}.shift button{width:100%}
+}
