@@ -1,4 +1,4 @@
-const CACHE = 'shop-pos-manager-v3';
+const CACHE = 'shop-pos-manager-v5';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.json'];
 
 self.addEventListener('install', event => {

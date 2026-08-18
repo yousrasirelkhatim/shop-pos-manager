@@ -9,6 +9,7 @@ const VIEW_LABELS = {
   purchases: 'المشتريات',
   employees: 'الموظفين',
   reports: 'التقارير',
+  accounts: 'الحسابات',
   settings: 'الإعدادات'
 };
 const EVENT_LABELS = {
@@ -65,7 +66,7 @@ async function request(path, options={}, retry=true){
 async function refreshSession(){
   const response=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
     method:'POST',
-    headers:{apikey:SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+    headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json'},
     body:JSON.stringify({refresh_token:session.refresh_token})
   });
   const body=await response.json().catch(()=>({}));
@@ -79,6 +80,7 @@ function escapeHtml(value){
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[char]));
 }
+function money(value){
   return `${Number(value||0).toLocaleString('ar-EG',{maximumFractionDigits:2})} ${currency}`;
 }
 
@@ -118,11 +120,15 @@ function currentAction(cashier){
 async function login(email,password){
   const response=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
     method:'POST',
-    headers:{apikey:SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+    headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json'},
     body:JSON.stringify({email,password})
   });
   const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(body.error_description||body.msg||'بيانات الدخول غير صحيحة');
+  if(!response.ok){
+    const msg=body.error_description||body.msg||'بيانات الدخول غير صحيحة';
+    if(/invalid login credentials/i.test(msg)) throw new Error('البريد أو كلمة المرور غير صحيحة. استخدم إيميل السحابة، مش رقم الكاشير.');
+    throw new Error(msg);
+  }
   session=body;
   localStorage.setItem('managerSession',JSON.stringify(session));
 }
