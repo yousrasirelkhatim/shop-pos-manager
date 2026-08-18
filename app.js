@@ -329,19 +329,81 @@ function renderShifts(){
 
 function renderFeed(){
   const today=liveFeed.today||{};
+  const all=liveFeed.all||{};
   $('todaySales').textContent=money(today.sales_total);
   $('todayCount').textContent=String(today.invoice_count||0);
   $('openCount').textContent=String(today.open_shifts||0);
   $('onlineCount').textContent=String((liveFeed.cashiers||[]).filter(cashier=>cashier.online).length);
+  const hint=$('historyHint');
+  if(hint){
+    if(all.invoice_count){
+      hint.textContent=`كل الفواتير المرفوعة من أجهزة الكاشير: ${all.invoice_count} فاتورة — ${money(all.sales_total)}`;
+    }else{
+      hint.textContent='ما في فواتير مرفوعة للسحابة بعد. افتحي برنامج الكاشير على الجهاز اللي حصل فيه البيع، اربطي السحابة من الإعدادات بنفس الإيميل، ثم اضغطي مزامنة الآن.';
+    }
+  }
   renderCashierFilter();
   renderCashiers();
   renderShifts();
+}
+
+async function loadHistory(){
+  try{
+    const [sales, items, shifts]=await Promise.all([
+      request('/rest/v1/sales?select=id,source_id,shift_source_id,invoice_no,subtotal,discount,tax,total,payment,paid,change_due,employee_name,sold_at,voided,voided_by,void_reason&order=sold_at.desc&limit=300'),
+      request('/rest/v1/sale_items?select=sale_source_id,name,price,quantity,line_total&limit=3000'),
+      request('/rest/v1/shifts?select=id,source_id,employee_id,employee_name,opened_at,open_cash,closed_at,status,close_mode,expected_cash&order=opened_at.desc&limit=100')
+    ]);
+    const itemsBySale={};
+    (items||[]).forEach(item=>{
+      (itemsBySale[item.sale_source_id]||(itemsBySale[item.sale_source_id]=[])).push(item);
+    });
+    const mappedSales=(sales||[]).map(sale=>({
+      ...sale,
+      items:itemsBySale[sale.source_id]||[]
+    }));
+    const salesByShift={};
+    mappedSales.forEach(sale=>{
+      (salesByShift[sale.shift_source_id]||(salesByShift[sale.shift_source_id]=[])).push(sale);
+    });
+    return {
+      sales:mappedSales,
+      shifts:(shifts||[]).map(shift=>({
+        ...shift,
+        sales:salesByShift[shift.source_id]||[],
+        movements:[],
+        activity:[]
+      }))
+    };
+  }catch(_error){
+    return { sales:[], shifts:[] };
+  }
+}
+
+function mergeHistory(feed, history){
+  const byKey=new Map((feed.shifts||[]).map(shift=>[shift.source_id||shift.id, shift]));
+  for(const shift of history.shifts||[]){
+    const key=shift.source_id||shift.id;
+    if(!byKey.has(key)) byKey.set(key, shift);
+    else if(!(byKey.get(key).sales||[]).length && (shift.sales||[]).length){
+      byKey.get(key).sales=shift.sales;
+    }
+  }
+  feed.shifts=[...byKey.values()];
+  const active=(history.sales||[]).filter(sale=>!sale.voided);
+  feed.all={
+    invoice_count:active.length,
+    sales_total:active.reduce((sum,sale)=>sum+Number(sale.total||0),0)
+  };
+  return feed;
 }
 
 async function refresh(){
   $('refreshButton').disabled=true;
   try{
     liveFeed=await request('/rest/v1/rpc/manager_live_feed',{method:'POST',body:'{}'});
+    const history=await loadHistory();
+    liveFeed=mergeHistory(liveFeed, history);
     currency=liveFeed.currency||currency;
     if(liveFeed.shop_name)$('shopName').textContent=liveFeed.shop_name;
     renderFeed();
@@ -407,5 +469,5 @@ localStorage.removeItem('managerSession');
 session=null;
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=8').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=9').catch(()=>{});
 }
