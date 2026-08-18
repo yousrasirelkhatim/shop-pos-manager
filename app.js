@@ -166,7 +166,7 @@ async function handleLogin(){
   const password=$('password').value;
   $('loginError').textContent='';
   if(!configured()){$('loginError').textContent='أضف بيانات Supabase في config.js أولاً';return;}
-  if(!email||!password){$('loginError').textContent='اكتبي البريد وكلمة المرور';return;}
+  if(!email||!password){$('loginError').textContent='اكتبي البريد وكلمة المرور ثم اضغطي دخول';return;}
   if(button){button.disabled=true;button.textContent='جاري الدخول...';}
   try{
     await login(email,password);
@@ -178,8 +178,15 @@ async function handleLogin(){
   }catch(error){
     $('loginError').textContent=error.message||'تعذر الدخول. تأكد من الإنترنت وحاولي مرة أخرى.';
   }finally{
-    if(button){button.disabled=false;button.textContent='دخول';}
+    updateLoginButton();
+    if(button)button.textContent='دخول';
   }
+}
+
+function updateLoginButton(){
+  const button=$('loginButton');
+  if(!button || button.textContent==='جاري الدخول...')return;
+  button.disabled=!$('email')?.value.trim() || !$('password')?.value;
 }
 
 function matchingShift(cashier){
@@ -220,7 +227,7 @@ function renderCashiers(){
   if(!cashiers.length){
     const empty=document.createElement('article');
     empty.className='card muted';
-    empty.textContent='لا يوجد كاشير نشط خلال الساعات الماضية. افتح برنامج الكاشير وربطه بالسحابة ليظهر هنا.';
+    empty.textContent='لا يوجد كاشير ظاهر بعد. من جهاز الكاشير ادخلي بحساب المدير ثم الإعدادات → ربط الحساب بنفس الإيميل واضغطي مزامنة الآن.';
     list.append(empty);
     return;
   }
@@ -277,7 +284,7 @@ function renderShifts(){
   if(!shifts.length){
     const empty=document.createElement('article');
     empty.className='card muted';
-    empty.textContent='لا توجد ورديات للعرض';
+    empty.textContent='لا توجد ورديات أو فواتير مرفوعة. البيع يتحفظ على جهاز الكاشير أولاً، وما يظهر هنا إلا بعد ربط السحابة والمزامنة.';
     list.append(empty);
     return;
   }
@@ -363,9 +370,12 @@ function openCloseDialog(shift){
 }
 
 window.__managerAppReady=true;
+updateLoginButton();
+$('email').addEventListener('input',updateLoginButton);
+$('password').addEventListener('input',updateLoginButton);
+$('loginButton').addEventListener('click',handleLogin);
 $('loginForm').addEventListener('submit',async event=>{
   event.preventDefault();
-  event.stopPropagation();
   await handleLogin();
 });
 
@@ -398,14 +408,9 @@ $('cashierFilter').addEventListener('change',event=>{
   renderShifts();
 });
 
-if(session&&configured()){
-  loadProfile().then(()=>{
-    showDashboard();
-    refresh();
-    refreshTimer=setInterval(refresh,8000);
-  }).catch(error=>{$('loginError').textContent=error.message;logout();});
-}
+localStorage.removeItem('managerSession');
+session=null;
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=6').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=7').catch(()=>{});
 }
