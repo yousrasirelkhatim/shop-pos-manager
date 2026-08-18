@@ -141,12 +141,45 @@ function logout(){
   $('loginView').classList.remove('hidden');
 }
 
+function sessionUserId(){
+  return session?.user?.id || session?.user_id || '';
+}
+
 async function loadProfile(){
-  const rows=await request(`/rest/v1/profiles?select=display_name,role,shops(name,currency)&user_id=eq.${encodeURIComponent(session.user.id)}`);
+  const userId=sessionUserId();
+  if(!userId)throw new Error('تعذر قراءة حساب الدخول. جرّبي مرة أخرى.');
+  const rows=await request(`/rest/v1/profiles?select=display_name,role,shops(name,currency)&user_id=eq.${encodeURIComponent(userId)}`);
   const profile=rows[0];
   if(!profile||profile.role!=='manager')throw new Error('هذا الحساب لا يملك صلاحية المدير');
   $('shopName').textContent=profile.shops?.name||'المحل';
   currency=profile.shops?.currency||'ج.م';
+}
+
+function showDashboard(){
+  $('loginView').classList.add('hidden');
+  $('dashboard').classList.remove('hidden');
+}
+
+async function handleLogin(){
+  const button=$('loginButton');
+  const email=$('email').value.trim();
+  const password=$('password').value;
+  $('loginError').textContent='';
+  if(!configured()){$('loginError').textContent='أضف بيانات Supabase في config.js أولاً';return;}
+  if(!email||!password){$('loginError').textContent='اكتبي البريد وكلمة المرور';return;}
+  if(button){button.disabled=true;button.textContent='جاري الدخول...';}
+  try{
+    await login(email,password);
+    await loadProfile();
+    showDashboard();
+    await refresh();
+    clearInterval(refreshTimer);
+    refreshTimer=setInterval(refresh,8000);
+  }catch(error){
+    $('loginError').textContent=error.message||'تعذر الدخول. تأكد من الإنترنت وحاولي مرة أخرى.';
+  }finally{
+    if(button){button.disabled=false;button.textContent='دخول';}
+  }
 }
 
 function matchingShift(cashier){
@@ -329,18 +362,11 @@ function openCloseDialog(shift){
   $('closeDialog').showModal();
 }
 
+window.__managerAppReady=true;
 $('loginForm').addEventListener('submit',async event=>{
   event.preventDefault();
-  $('loginError').textContent='';
-  if(!configured()){$('loginError').textContent='أضف بيانات Supabase في config.js أولاً';return;}
-  try{
-    await login($('email').value.trim(),$('password').value);
-    await loadProfile();
-    $('loginView').classList.add('hidden');
-    $('dashboard').classList.remove('hidden');
-    await refresh();
-    refreshTimer=setInterval(refresh,8000);
-  }catch(error){$('loginError').textContent=error.message;logout();}
+  event.stopPropagation();
+  await handleLogin();
 });
 
 $('closeForm').addEventListener('submit',async event=>{
@@ -374,13 +400,12 @@ $('cashierFilter').addEventListener('change',event=>{
 
 if(session&&configured()){
   loadProfile().then(()=>{
-    $('loginView').classList.add('hidden');
-    $('dashboard').classList.remove('hidden');
+    showDashboard();
     refresh();
     refreshTimer=setInterval(refresh,8000);
   }).catch(error=>{$('loginError').textContent=error.message;logout();});
 }
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=6').catch(()=>{});
 }

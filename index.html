@@ -15,10 +15,10 @@
       <div class="logo">📊</div>
       <h1>لوحة المدير</h1>
       <p>سجّل الدخول لمتابعة المحل من أي مكان</p>
-      <form id="loginForm">
-        <label>البريد الإلكتروني<input id="email" type="email" autocomplete="username" placeholder="manager.demo.2026@example.com" required></label>
-        <label>كلمة المرور<input id="password" type="password" autocomplete="current-password" required></label>
-        <button type="submit">دخول</button>
+      <form id="loginForm" method="post" action="." novalidate>
+        <label>البريد الإلكتروني<input id="email" name="email" type="text" inputmode="email" autocomplete="username" placeholder="manager.demo.2026@example.com" required></label>
+        <label>كلمة المرور<input id="password" name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit" id="loginButton">دخول</button>
       </form>
       <div id="loginError" class="error"></div>
     </section>
@@ -76,6 +76,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="app.js"></script>
+  <script src="boot.js?v=6"></script>
+  <script type="module" src="app.js?v=6"></script>
 </body>
 </html>

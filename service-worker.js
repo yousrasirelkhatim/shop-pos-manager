@@ -1,5 +1,5 @@
-const CACHE = 'shop-pos-manager-v5';
-const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.json'];
+const CACHE = 'shop-pos-manager-v6';
+const SHELL = ['./', './index.html', './styles.css', './app.js', './boot.js', './config.js', './manifest.json'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -21,6 +21,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const requestUrl = new URL(event.request.url);
   if (event.request.method !== 'GET' || requestUrl.origin !== self.location.origin) return;
+  const isScript = requestUrl.pathname.endsWith('.js');
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -30,6 +31,9 @@ self.addEventListener('fetch', event => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+      .catch(() => {
+        if (isScript) return caches.match(event.request);
+        return caches.match(event.request).then(cached => cached || caches.match('./index.html'));
+      })
   );
 });
