@@ -178,15 +178,8 @@ async function handleLogin(){
   }catch(error){
     $('loginError').textContent=error.message||'تعذر الدخول. تأكد من الإنترنت وحاولي مرة أخرى.';
   }finally{
-    updateLoginButton();
-    if(button)button.textContent='دخول';
+    if(button){button.disabled=false;button.textContent='دخول';}
   }
-}
-
-function updateLoginButton(){
-  const button=$('loginButton');
-  if(!button || button.textContent==='جاري الدخول...')return;
-  button.disabled=!$('email')?.value.trim() || !$('password')?.value;
 }
 
 function matchingShift(cashier){
@@ -370,14 +363,16 @@ function openCloseDialog(shift){
 }
 
 window.__managerAppReady=true;
-updateLoginButton();
-$('email').addEventListener('input',updateLoginButton);
-$('password').addEventListener('input',updateLoginButton);
-$('loginButton').addEventListener('click',handleLogin);
-$('loginForm').addEventListener('submit',async event=>{
-  event.preventDefault();
-  await handleLogin();
-});
+window.__managerHandleLogin=handleLogin;
+window.__managerAfterLogin=async function(){
+  session=window.__managerSession||JSON.parse(localStorage.getItem('managerSession')||'null');
+  if(!session)return;
+  await loadProfile();
+  showDashboard();
+  await refresh();
+  clearInterval(refreshTimer);
+  refreshTimer=setInterval(refresh,8000);
+};
 
 $('closeForm').addEventListener('submit',async event=>{
   event.preventDefault();
@@ -412,5 +407,5 @@ localStorage.removeItem('managerSession');
 session=null;
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=7').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=8').catch(()=>{});
 }

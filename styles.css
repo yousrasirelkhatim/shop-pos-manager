@@ -8,8 +8,7 @@ main{width:min(1100px,100%);margin:auto;padding:20px}
 .logo{font-size:48px}.login h1{margin:8px 0}.login p,.muted,.hint{color:#7d7788}
 .hint{margin:0 0 18px;font-size:13px}
 .login input{font-size:16px}
-.login #loginButton{width:100%;margin-top:4px}
-.login #loginButton:disabled{opacity:.45;cursor:not-allowed}
+.login #loginButton{width:100%;margin-top:8px;position:relative;z-index:5;pointer-events:auto}
 label{display:grid;gap:6px;font-weight:650}
 input,select{width:100%;padding:12px;border:1.5px solid #ded9e4;border-radius:11px;font:inherit;background:#fff}
 input:focus,select:focus{outline:none;border-color:#e8446a}
