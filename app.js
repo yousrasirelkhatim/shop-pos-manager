@@ -172,15 +172,49 @@ async function handleLogin(){
   try{
     await login(email,password);
     await loadProfile();
-    showDashboard();
-    await refresh();
-    clearInterval(refreshTimer);
-    refreshTimer=setInterval(refresh,8000);
+    await startLive();
   }catch(error){
     $('loginError').textContent=error.message||'تعذر الدخول. تأكد من الإنترنت وحاولي مرة أخرى.';
   }finally{
     if(button){button.disabled=false;button.textContent='دخول اللوحة';}
   }
+}
+
+function visibleCashiers(){
+  return (liveFeed.cashiers||[]).filter(cashier=>
+    cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__'
+  );
+}
+
+function currentMonthKey(){
+  const date=new Date();
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+}
+
+function monthLabel(key){
+  const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const [year,month]=String(key||'').split('-').map(Number);
+  if(!year||!month)return '';
+  return `${months[month-1]} ${year}`;
+}
+
+function monthKeyFromIso(value){
+  if(!value)return '';
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime()))return String(value).slice(0,7);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+}
+
+function summaryFromInvoices(sales){
+  const month=currentMonthKey();
+  const rows=(sales||[]).filter(sale=>!sale.voided && monthKeyFromIso(sale.sold_at)===month);
+  return {
+    month,
+    month_label:monthLabel(month),
+    sales:rows.reduce((sum,sale)=>sum+Number(sale.total||0),0),
+    invoices:rows.length,
+    from_invoices:true
+  };
 }
 
 function matchingShift(cashier){
@@ -202,36 +236,46 @@ function filteredShifts(){
 }
 
 function renderCashierFilter(){
-  const select=$('cashierFilter');
-  const current=select.value||'all';
-  const options=['<option value="all">كل الكاشيرات</option>'];
-  (liveFeed.cashiers||[]).filter(cashier=>cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__').forEach(cashier=>{
-    const value=cashier.employee_id||cashier.employee_name;
-    options.push(`<option value="${value}">${cashier.employee_name}</option>`);
+  const tabs=$('cashierTabs');
+  if(!tabs)return;
+  const cashiers=visibleCashiers();
+  const items=[{value:'all',label:'الكل'}].concat(cashiers.map(cashier=>({
+    value:cashier.employee_id||cashier.employee_name,
+    label:cashier.employee_name
+  })));
+  if(!items.some(item=>String(item.value)===String(cashierFilter)))cashierFilter='all';
+  tabs.innerHTML=items.map(item=>
+    `<button type="button" class="tab ${String(item.value)===String(cashierFilter)?'active':''}" data-filter="${escapeHtml(item.value)}">${escapeHtml(item.label)}</button>`
+  ).join('');
+  tabs.querySelectorAll('.tab').forEach(button=>{
+    button.addEventListener('click',()=>{
+      cashierFilter=button.getAttribute('data-filter')||'all';
+      renderCashierFilter();
+      renderCashiers();
+      renderShifts();
+    });
   });
-  select.innerHTML=options.join('');
-  select.value=[...select.options].some(option=>option.value===current)?current:'all';
-  cashierFilter=select.value;
 }
 
 function renderCashiers(){
   const list=$('cashierList');
   list.replaceChildren();
-  const cashiers=(liveFeed.cashiers||[]).filter(cashier=>
-    cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__'
-  );
+  const cashiers=visibleCashiers().slice().sort((a,b)=>Number(!!b.online)-Number(!!a.online));
   if(!cashiers.length){
     const empty=document.createElement('article');
     empty.className='empty-card';
-    empty.textContent='لا يوجد كاشير ظاهر بعد. من جهاز الكاشير ادخلي بحساب المدير ثم الإعدادات → ربط الحساب بنفس الإيميل واضغطي مزامنة الآن.';
+    empty.textContent='لا توجد محطة ظاهرة بعد. من جهاز الكاشير اربطي السحابة ثم اتركي البرنامج مفتوحاً؛ التحديث يتم تلقائياً.';
     list.append(empty);
     return;
   }
   cashiers.forEach(cashier=>{
     if(cashierFilter!=='all' && cashier.employee_id!==cashierFilter && cashier.employee_name!==cashierFilter)return;
     const shift=matchingShift(cashier);
-    const card=document.createElement('article');
+    const sales=(shift?.sales||[]).filter(sale=>!sale.voided);
+    const total=sales.reduce((sum,sale)=>sum+Number(sale.total||0),0);
+    const cart=Number(cashier.details?.itemCount||0);
     const name=cashier.employee_name||'موظف';
+    const card=document.createElement('article');
     card.className=`cashier ${cashier.online?'online':'offline'}`;
     card.innerHTML=`
       <div class="cashier-head">
@@ -242,12 +286,15 @@ function renderCashiers(){
             <p>${cashier.employee_role==='manager'?'مدير':'كاشير'}</p>
           </div>
         </div>
-        <span class="status status-pill">${cashier.online?'متصل الآن':'غير متصل'}</span>
+        <span class="status status-pill">${cashier.online?'متصل':'غير متصل'}</span>
       </div>
-      <p class="now">${escapeHtml(currentAction(cashier))}</p>
-      <p>صاحب الوردية: <strong>${escapeHtml(shift?.employee_name||cashier.shift_owner||'لا توجد وردية مفتوحة')}</strong></p>
-      <p>آخر نشاط: ${ago(cashier.happened_at)}</p>
-      ${Number(cashier.details?.itemCount)>0?`<p>السلة الحالية: ${cashier.details.itemCount} أصناف / ${cashier.details.quantity||0} قطعة</p>`:''}
+      <p class="cashier-action">${escapeHtml(currentAction(cashier))}</p>
+      ${cart>0?`<span class="cart-flag">السلة: ${cart} أصناف</span>`:''}
+      <p class="cashier-meta">${ago(cashier.happened_at)||'لا يوجد نشاط حديث'}</p>
+      <div class="station-stats">
+        <div><span>فواتير الوردية</span><strong>${sales.length}</strong></div>
+        <div><span>مبيعات الوردية</span><strong>${money(total)}</strong></div>
+      </div>
     `;
     list.append(card);
   });
@@ -277,61 +324,71 @@ function saleCard(sale){
   `;
 }
 
-function renderShifts(){
-  const list=$('shiftList');
-  list.replaceChildren();
-  const shifts=filteredShifts();
-  if(!shifts.length){
-    const empty=document.createElement('article');
-    empty.className='empty-card';
-    empty.textContent='لا توجد ورديات أو فواتير مرفوعة. البيع يتحفظ على جهاز الكاشير أولاً، وما يظهر هنا إلا بعد ربط السحابة والمزامنة.';
-    list.append(empty);
-    return;
-  }
-  shifts.forEach(shift=>{
-    const open=shift.status==='open';
-    const sales=shift.sales||[];
-    const activeSales=sales.filter(sale=>!sale.voided);
-    const card=document.createElement('article');
-    card.className=`shift ${open?'open':''}`;
-    const expanded=selectedShiftId===shift.id;
-    card.innerHTML=`
-      <div class="shift-head">
-        <div>
-          <h3>${escapeHtml(shift.employee_name)}</h3>
-          <p>بدأت: ${formatTime(shift.opened_at)}</p>
-          <p class="expected">المتوقع في الدرج: ${money(shift.expected_cash)}</p>
-          <p>${open?'وردية مفتوحة':`أُغلقت ${shift.close_mode==='remote'?'عن بُعد':'محلياً'}`}</p>
-        </div>
-        <div class="shift-actions">
-          <span class="pill">${activeSales.length} فواتير</span>
-          ${open?`<button class="btn danger close-shift" type="button">إغلاق الوردية</button>`:''}
-          <button class="btn ghost toggle-details" type="button">${expanded?'إخفاء التفاصيل':'عرض التفاصيل'}</button>
-        </div>
+function shiftCard(shift){
+  const open=shift.status==='open';
+  const sales=shift.sales||[];
+  const activeSales=sales.filter(sale=>!sale.voided);
+  const total=activeSales.reduce((sum,sale)=>sum+Number(sale.total||0),0);
+  const card=document.createElement('article');
+  card.className=`shift ${open?'open':''}`;
+  const expanded=selectedShiftId===shift.id;
+  card.innerHTML=`
+    <div class="shift-head">
+      <div>
+        <h3>${escapeHtml(shift.employee_name)}</h3>
+        <p>${open?'وردية مفتوحة':'أُغلقت'} — ${formatTime(shift.opened_at)}</p>
+        <p class="expected">الدرج المتوقع: ${money(shift.expected_cash)}</p>
+        <p>مبيعات الوردية: <strong>${money(total)}</strong></p>
       </div>
-      ${expanded?`
-        <div class="details">
-          <h4>الفواتير والأصناف</h4>
-          ${sales.length?sales.map(saleCard).join(''):'<p class="muted">لا توجد فواتير في هذه الوردية</p>'}
-          <h4>حركات الدرج</h4>
-          ${(shift.movements||[]).length
-            ?(shift.movements||[]).map(move=>`<p>${move.movement_type==='out'?'سحب':'إيداع'} ${money(move.amount)} — ${move.note||'بدون ملاحظة'} — ${formatTime(move.happened_at)}</p>`).join('')
-            :'<p class="muted">لا توجد حركات درج</p>'}
-          <h4>آخر نشاط في هذه الوردية</h4>
-          ${(shift.activity||[]).length
-            ?(shift.activity||[]).map(event=>`<p>${eventLabel(event)} — ${ago(event.happened_at)}</p>`).join('')
-            :'<p class="muted">لا يوجد سجل نشاط بعد</p>'}
-        </div>
-      `:''}
-    `;
-    card.querySelector('.toggle-details').addEventListener('click',()=>{
-      selectedShiftId=expanded?null:shift.id;
-      renderShifts();
-    });
-    const closeButton=card.querySelector('.close-shift');
-    if(closeButton)closeButton.addEventListener('click',()=>openCloseDialog(shift));
-    list.append(card);
+      <div class="shift-actions">
+        <span class="pill">${activeSales.length} فواتير</span>
+        ${open?`<button class="btn danger close-shift" type="button">إغلاق</button>`:''}
+        <button class="btn ghost toggle-details" type="button">${expanded?'إخفاء':'التفاصيل'}</button>
+      </div>
+    </div>
+    ${expanded?`
+      <div class="details">
+        <h4>الفواتير والأصناف</h4>
+        ${sales.length?sales.map(saleCard).join(''):'<p class="muted">لا توجد فواتير في هذه الوردية</p>'}
+        <h4>حركات الدرج</h4>
+        ${(shift.movements||[]).length
+          ?(shift.movements||[]).map(move=>`<p>${move.movement_type==='out'?'سحب':'إيداع'} ${money(move.amount)} — ${move.note||'بدون ملاحظة'} — ${formatTime(move.happened_at)}</p>`).join('')
+          :'<p class="muted">لا توجد حركات درج</p>'}
+      </div>
+    `:''}
+  `;
+  card.querySelector('.toggle-details').addEventListener('click',()=>{
+    selectedShiftId=expanded?null:shift.id;
+    renderShifts();
   });
+  const closeButton=card.querySelector('.close-shift');
+  if(closeButton)closeButton.addEventListener('click',()=>openCloseDialog(shift));
+  return card;
+}
+
+function renderShifts(){
+  const openBox=$('openShifts');
+  const closedBox=$('shiftList');
+  const title=$('closedTitle');
+  const shifts=filteredShifts();
+  const open=shifts.filter(shift=>shift.status==='open');
+  const closed=shifts.filter(shift=>shift.status!=='open');
+  if(openBox){
+    openBox.replaceChildren();
+    if(!open.length){
+      const empty=document.createElement('article');
+      empty.className='empty-card';
+      empty.textContent=shifts.length?'لا توجد وردية مفتوحة الآن.':'لا توجد ورديات مرفوعة بعد. البرنامج يرفعها تلقائياً وهو شغال ومتصل.';
+      openBox.append(empty);
+    }else{
+      open.forEach(shift=>openBox.append(shiftCard(shift)));
+    }
+  }
+  if(closedBox){
+    closedBox.replaceChildren();
+    closed.forEach(shift=>closedBox.append(shiftCard(shift)));
+  }
+  if(title)title.classList.toggle('hidden', !closed.length);
 }
 
 function renderAccountsPanel(){
@@ -340,10 +397,11 @@ function renderAccountsPanel(){
   if(!panel)return;
   const summary=accountsSummary;
   if(label)label.textContent=summary?.month_label||'';
-  if(!summary||!summary.month){
-    panel.innerHTML='<article class="empty-card">أرقام الحسابات تظهر هنا بعد مزامنة جهاز الكاشير (إجمالي المبيعات، الربح، والتارجت).</article>';
+  if(!summary||summary.sales==null&&!summary.month){
+    panel.innerHTML='<article class="empty-card">ما في أرقام هذا الشهر بعد. أول ما يحصل بيع على جهاز مربوط، المبيعات تظهر هنا تلقائياً.</article>';
     return;
   }
+  const snapshot=!summary.from_invoices && summary.net!=null;
   const profit=Number(summary.net||0)>=0;
   const dayTarget=Number(summary.day_target||0);
   const avgDaily=Number(summary.avg_daily||0);
@@ -352,21 +410,22 @@ function renderAccountsPanel(){
   const fill=Math.min(100,avgDaily/maxScale*100);
   const bePos=Math.min(98,Math.max(1,breakEven/maxScale*100));
   panel.innerHTML=`
-    <article class="accounts-hero ${profit?'profit':'loss'}">
+    <article class="accounts-hero ${snapshot?(profit?'profit':'loss'):''}">
       <div>
-        <div class="lbl">صافي الربح الشهري</div>
-        <div class="val">${money(summary.net)}</div>
+        <div class="lbl">${snapshot?'صافي الربح الشهري':'إجمالي مبيعات الشهر'}</div>
+        <div class="val">${snapshot?money(summary.net):money(summary.sales)}</div>
       </div>
-      <span class="status-pill">${profit?'ربح':'خسارة'}</span>
+      <span class="status-pill">${snapshot?(profit?'ربح':'خسارة'):`${summary.invoices||0} فاتورة`}</span>
     </article>
     <div class="accounts-stats">
       <article class="mini-kpi kpi-card tone-sales"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16l5-5 4 3 7-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>إجمالي المبيعات</span><strong>${money(summary.sales)}</strong></article>
-      <article class="mini-kpi kpi-card tone-profit"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M7 8h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>ربح المبيعات</span><strong>${money(summary.profit)}</strong></article>
-      <article class="mini-kpi kpi-card tone-loss"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M7 7l1 13h8l1-13M9 7V5h6v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>المصاريف الثابتة</span><strong>${money(summary.expenses)}</strong></article>
-      <article class="mini-kpi kpi-card tone-target"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></div><span>تارجت اليوم</span><strong>${Number(summary.day_target||0).toLocaleString('ar-EG')}</strong></article>
-      <article class="mini-kpi kpi-card tone-invoices"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19V6h14v13l-7-3-7 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span>تارجت الشهر</span><strong>${Number(summary.month_target||0).toLocaleString('ar-EG')}</strong></article>
-      <article class="mini-kpi kpi-card tone-shifts"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h14M7 16V8m5 8V5m5 11v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>نقطة التعادل</span><strong>${Number(summary.break_even_day||0).toLocaleString('ar-EG',{maximumFractionDigits:1})}</strong></article>
+      <article class="mini-kpi kpi-card tone-profit"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M7 8h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>ربح المبيعات</span><strong>${snapshot?money(summary.profit):'—'}</strong></article>
+      <article class="mini-kpi kpi-card tone-loss"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M7 7l1 13h8l1-13M9 7V5h6v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>المصاريف الثابتة</span><strong>${snapshot?money(summary.expenses):'—'}</strong></article>
+      <article class="mini-kpi kpi-card tone-target"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></div><span>تارجت اليوم</span><strong>${snapshot?Number(summary.day_target||0).toLocaleString('ar-EG'):'—'}</strong></article>
+      <article class="mini-kpi kpi-card tone-invoices"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19V6h14v13l-7-3-7 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span>تارجت الشهر</span><strong>${snapshot?Number(summary.month_target||0).toLocaleString('ar-EG'):'—'}</strong></article>
+      <article class="mini-kpi kpi-card tone-shifts"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h14M7 16V8m5 8V5m5 11v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>نقطة التعادل</span><strong>${snapshot?Number(summary.break_even_day||0).toLocaleString('ar-EG',{maximumFractionDigits:1}):'—'}</strong></article>
     </div>
+    ${snapshot?`
     <div class="meter-wrap">
       <p class="muted">البيع اليومي الفعلي ${Number(avgDaily).toLocaleString('ar-EG',{maximumFractionDigits:1})} / التارجت ${dayTarget||'—'} منتج في اليوم</p>
       <svg class="meter-svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
@@ -375,7 +434,7 @@ function renderAccountsPanel(){
         <rect x="${bePos.toFixed(1)}" y="0" width="1.6" height="8" fill="#fb7185"></rect>
       </svg>
       <div class="acc-meter-scale"><span>0</span><span>${Math.round(maxScale)}</span></div>
-    </div>
+    </div>`:'<p class="hint">الربح والتارجت يكتملان بعد مزامنة واحدة من برنامج الكاشير المحدّث، ثم يتحدثان تلقائياً.</p>'}
   `;
 }
 
@@ -467,6 +526,9 @@ async function refresh(){
     const history=await loadHistory();
     liveFeed=mergeHistory(liveFeed, history);
     accountsSummary=await loadAccountsSummary();
+    if(!accountsSummary||!accountsSummary.month){
+      accountsSummary=summaryFromInvoices(history.sales);
+    }
     currency=liveFeed.currency||currency;
     if(liveFeed.shop_name)$('shopName').textContent=liveFeed.shop_name;
     renderFeed();
@@ -487,16 +549,41 @@ function openCloseDialog(shift){
   $('closeDialog').showModal();
 }
 
+async function startLive(){
+  showDashboard();
+  await refresh();
+  clearInterval(refreshTimer);
+  refreshTimer=setInterval(refresh,8000);
+}
+
+async function restoreSession(){
+  try{
+    session=JSON.parse(localStorage.getItem('managerSession')||'null');
+  }catch(_error){
+    session=null;
+  }
+  if(!session?.access_token)return;
+  try{
+    await loadProfile();
+    await startLive();
+  }catch(_error){
+    try{
+      if(!session?.refresh_token)throw new Error('no refresh');
+      await refreshSession();
+      await loadProfile();
+      await startLive();
+    }catch(_refreshError){
+      logout();
+    }
+  }
+}
 window.__managerAppReady=true;
 window.__managerHandleLogin=handleLogin;
 window.__managerAfterLogin=async function(){
   session=window.__managerSession||JSON.parse(localStorage.getItem('managerSession')||'null');
   if(!session)return;
   await loadProfile();
-  showDashboard();
-  await refresh();
-  clearInterval(refreshTimer);
-  refreshTimer=setInterval(refresh,8000);
+  await startLive();
 };
 
 $('closeForm').addEventListener('submit',async event=>{
@@ -522,15 +609,9 @@ $('closeForm').addEventListener('submit',async event=>{
 $('cancelClose').addEventListener('click',()=>$('closeDialog').close());
 $('refreshButton').addEventListener('click',refresh);
 $('logoutButton').addEventListener('click',logout);
-$('cashierFilter').addEventListener('change',event=>{
-  cashierFilter=event.target.value;
-  renderCashiers();
-  renderShifts();
-});
 
-localStorage.removeItem('managerSession');
-session=null;
+restoreSession();
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=11').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=12').catch(()=>{});
 }

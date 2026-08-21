@@ -132,7 +132,31 @@ input:focus,select:focus{outline:none;border-color:#38bdf8;box-shadow:0 0 0 3px 
 .meter-svg{width:100%;height:14px;display:block}
 .acc-meter-scale{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin:8px 0 4px}
 
-.cashier-list,.shift-list{display:grid;gap:12px}
+.dash-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start;margin-bottom:16px}
+.dash-grid .panel{margin-bottom:0;min-height:100%}
+.filter-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.filter-tabs .tab{
+  border:1px solid var(--line);background:rgba(148,163,184,.08);color:var(--text);
+  border-radius:999px;padding:8px 12px;font:inherit;font-weight:800;cursor:pointer
+}
+.filter-tabs .tab.active{background:linear-gradient(135deg,#0ea5e9,#14b8a6);color:#04212a;border-color:transparent}
+.cashier-grid .empty-card,.shift-board .empty-card{grid-column:1/-1}
+.cashier{padding:16px;display:flex;flex-direction:column;gap:10px;min-height:210px}
+.cashier.online{background:linear-gradient(180deg,rgba(16,185,129,.16),rgba(22,32,51,.9));border-color:rgba(52,211,153,.4)}
+.cashier-action{
+  margin:0;padding:10px 12px;border-radius:14px;background:rgba(15,23,42,.55);
+  color:var(--text);font-weight:750;line-height:1.5
+}
+.cashier-meta{margin:0;color:var(--muted);font-size:12px}
+.station-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}
+.station-stats div{background:rgba(15,23,42,.5);border-radius:12px;padding:10px}
+.station-stats span{display:block;color:var(--muted);font-size:11px;font-weight:700}
+.station-stats strong{font-size:15px}
+.cart-flag{align-self:flex-start;background:rgba(251,191,36,.14);color:#fcd34d;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800}
+.shift-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:18px}
+.shift.open{border-color:rgba(52,211,153,.35);background:linear-gradient(180deg,rgba(16,185,129,.12),rgba(22,32,51,.9))}
+.board-title{margin:4px 0 10px;font-size:15px;color:var(--muted)}
+.shift-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
 .cashier,.shift{padding:18px;transition:transform .16s,border-color .16s}
 .cashier:hover,.shift:hover{transform:translateY(-2px)}
 .cashier-head,.shift-head,.sale-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
@@ -168,6 +192,9 @@ dialog::backdrop{background:rgba(2,8,23,.72)}
 .dialog-actions{display:flex;gap:10px;margin-top:8px}
 .dialog-actions .btn{flex:1}
 
+@media(max-width:980px){
+  .dash-grid{grid-template-columns:1fr}
+}
 @media(max-width:900px){
   .kpi-row,.accounts-stats{grid-template-columns:1fr 1fr}
 }

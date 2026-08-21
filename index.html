@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>لوحة المدير</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
   <div class="app-bg" aria-hidden="true"></div>
@@ -82,34 +82,32 @@
 
       <p id="historyHint" class="hint"></p>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>الحسابات هذا الشهر</h2>
-            <p class="panel-sub">إجمالي المبيعات، الربح، والتارجت</p>
+      <div class="dash-grid">
+        <section class="panel accounts-panel">
+          <div class="panel-head">
+            <div>
+              <h2>الحسابات هذا الشهر</h2>
+              <p class="panel-sub">إجمالي المبيعات، الربح، والتارجت</p>
+            </div>
+            <span id="accountsMonthLabel" class="chip"></span>
           </div>
-          <span id="accountsMonthLabel" class="chip"></span>
-        </div>
-        <div id="accountsPanel"></div>
-      </section>
+          <div id="accountsPanel"></div>
+        </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>الكاشير الآن</h2>
-            <p class="panel-sub">آخر نشاط على أجهزة البيع</p>
+        <section class="panel cashiers-panel">
+          <div class="panel-head">
+            <div>
+              <h2>محطات الكاشير</h2>
+              <p class="panel-sub">المتصلون أولاً، مع مبيعات الوردية الحالية</p>
+            </div>
           </div>
-          <div class="toolbar">
-            <label class="select-wrap">
-              <span class="sr-only">تصفية حسب الكاشير</span>
-              <select id="cashierFilter" aria-label="تصفية حسب الكاشير">
-                <option value="all">كل الكاشيرات</option>
-              </select>
-            </label>
-          </div>
-        </div>
-        <div id="cashierList" class="cashier-list"></div>
-      </section>
+          <div id="cashierTabs" class="filter-tabs"></div>
+          <select id="cashierFilter" class="hidden" aria-hidden="true">
+            <option value="all">كل الكاشيرات</option>
+          </select>
+          <div id="cashierList" class="cashier-grid"></div>
+        </section>
+      </div>
 
       <section class="panel">
         <div class="panel-head">
@@ -118,6 +116,8 @@
             <p class="panel-sub">الفواتير، الدرج، وإغلاق الوردية عن بُعد</p>
           </div>
         </div>
+        <div id="openShifts" class="shift-board"></div>
+        <h3 class="board-title" id="closedTitle">ورديات سابقة</h3>
         <div id="shiftList" class="shift-list"></div>
         <p id="lastRefresh" class="muted last-refresh"></p>
       </section>
@@ -143,7 +143,7 @@
     </form>
   </dialog>
 
-  <script src="boot.js?v=11"></script>
-  <script type="module" src="app.js?v=11"></script>
+  <script src="boot.js?v=12"></script>
+  <script type="module" src="app.js?v=12"></script>
 </body>
 </html>
