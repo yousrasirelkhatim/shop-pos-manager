@@ -438,13 +438,27 @@ function renderAccountsPanel(){
   `;
 }
 
+function summaryFromRecord(value){
+  const data=value&&typeof value==='object'?(value.details||value):null;
+  if(!data||typeof data!=='object')return null;
+  if(data.from_invoices)return null;
+  if(data.kind==='accounts_summary' || data.day_target!=null || data.net!=null && data.month){
+    return data;
+  }
+  return null;
+}
+
 async function loadAccountsSummary(){
+  const fromLive=(liveFeed.cashiers||[]).map(summaryFromRecord).find(Boolean);
+  if(fromLive)return fromLive;
   try{
-    const rows=await request('/rest/v1/activity_events?event_type=eq.accounts_summary&select=details,happened_at&order=happened_at.desc&limit=1');
-    const details=rows&&rows[0]&&rows[0].details;
-    if(details&&typeof details==='object')return details;
+    const rows=await request('/rest/v1/activity_events?or=(event_type.eq.accounts_summary,device_id.eq.__accounts__,view_name.eq.accounts)&select=details,event_type,view_name,device_id,happened_at&order=happened_at.desc&limit=30');
+    for(const row of rows||[]){
+      const summary=summaryFromRecord(row);
+      if(summary)return summary;
+    }
   }catch(_error){}
-  return liveFeed.accounts_summary&&liveFeed.accounts_summary.month?liveFeed.accounts_summary:null;
+  return summaryFromRecord(liveFeed.accounts_summary);
 }
 
 function renderFeed(){
@@ -613,5 +627,5 @@ $('logoutButton').addEventListener('click',logout);
 restoreSession();
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=12').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=13').catch(()=>{});
 }

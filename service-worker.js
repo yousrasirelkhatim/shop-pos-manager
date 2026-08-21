@@ -1,5 +1,5 @@
-const CACHE = 'shop-pos-manager-v12';
-const SHELL = ['./', './index.html', './styles.css', './app.js', './boot.js', './config.js', './manifest.json'];
+const CACHE = 'shop-pos-manager-v13';
+const SHELL = ['./', './index.html', './styles.css', './app.js', './boot.js', './config.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
