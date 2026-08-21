@@ -21,7 +21,7 @@
   function finish() {
     busy = false;
     button.disabled = false;
-    button.textContent = 'دخول';
+    button.textContent = 'دخول اللوحة';
   }
 
   function fallbackLogin() {

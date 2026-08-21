@@ -32,6 +32,7 @@ let currency = 'ج.م';
 let refreshTimer = null;
 let liveFeed = { cashiers: [], shifts: [], today: {} };
 let cashierFilter = 'all';
+let accountsSummary = null;
 
 function configured(){
   return SUPABASE_URL && SUPABASE_ANON_KEY
@@ -178,7 +179,7 @@ async function handleLogin(){
   }catch(error){
     $('loginError').textContent=error.message||'تعذر الدخول. تأكد من الإنترنت وحاولي مرة أخرى.';
   }finally{
-    if(button){button.disabled=false;button.textContent='دخول';}
+    if(button){button.disabled=false;button.textContent='دخول اللوحة';}
   }
 }
 
@@ -204,7 +205,7 @@ function renderCashierFilter(){
   const select=$('cashierFilter');
   const current=select.value||'all';
   const options=['<option value="all">كل الكاشيرات</option>'];
-  (liveFeed.cashiers||[]).forEach(cashier=>{
+  (liveFeed.cashiers||[]).filter(cashier=>cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__').forEach(cashier=>{
     const value=cashier.employee_id||cashier.employee_name;
     options.push(`<option value="${value}">${cashier.employee_name}</option>`);
   });
@@ -216,10 +217,12 @@ function renderCashierFilter(){
 function renderCashiers(){
   const list=$('cashierList');
   list.replaceChildren();
-  const cashiers=liveFeed.cashiers||[];
+  const cashiers=(liveFeed.cashiers||[]).filter(cashier=>
+    cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__'
+  );
   if(!cashiers.length){
     const empty=document.createElement('article');
-    empty.className='card muted';
+    empty.className='empty-card';
     empty.textContent='لا يوجد كاشير ظاهر بعد. من جهاز الكاشير ادخلي بحساب المدير ثم الإعدادات → ربط الحساب بنفس الإيميل واضغطي مزامنة الآن.';
     list.append(empty);
     return;
@@ -228,14 +231,18 @@ function renderCashiers(){
     if(cashierFilter!=='all' && cashier.employee_id!==cashierFilter && cashier.employee_name!==cashierFilter)return;
     const shift=matchingShift(cashier);
     const card=document.createElement('article');
-    card.className=`card cashier ${cashier.online?'online':'offline'}`;
+    const name=cashier.employee_name||'موظف';
+    card.className=`cashier ${cashier.online?'online':'offline'}`;
     card.innerHTML=`
       <div class="cashier-head">
-        <div>
-          <h3>${escapeHtml(cashier.employee_name)}</h3>
-          <p>${cashier.employee_role==='manager'?'مدير':'كاشير'}</p>
+        <div class="identity">
+          <div class="avatar">${escapeHtml(name.trim().slice(0,1))}</div>
+          <div>
+            <h3>${escapeHtml(name)}</h3>
+            <p>${cashier.employee_role==='manager'?'مدير':'كاشير'}</p>
+          </div>
         </div>
-        <span class="status">${cashier.online?'متصل الآن':'غير متصل'}</span>
+        <span class="status status-pill">${cashier.online?'متصل الآن':'غير متصل'}</span>
       </div>
       <p class="now">${escapeHtml(currentAction(cashier))}</p>
       <p>صاحب الوردية: <strong>${escapeHtml(shift?.employee_name||cashier.shift_owner||'لا توجد وردية مفتوحة')}</strong></p>
@@ -254,7 +261,7 @@ function saleCard(sale){
     <article class="sale ${sale.voided?'voided':''}">
       <div class="sale-head">
         <h4>فاتورة #${sale.invoice_no||'—'}</h4>
-        <span>${sale.voided?'ملغاة':(sale.payment==='card'?'فيزا':'نقدي')}</span>
+        <span class="status-pill">${sale.voided?'ملغاة':(sale.payment==='card'?'فيزا':'نقدي')}</span>
       </div>
       <p>${formatTime(sale.sold_at)} — الكاشير: ${escapeHtml(sale.employee_name||'—')}</p>
       <ul class="items">${items}</ul>
@@ -276,7 +283,7 @@ function renderShifts(){
   const shifts=filteredShifts();
   if(!shifts.length){
     const empty=document.createElement('article');
-    empty.className='card muted';
+    empty.className='empty-card';
     empty.textContent='لا توجد ورديات أو فواتير مرفوعة. البيع يتحفظ على جهاز الكاشير أولاً، وما يظهر هنا إلا بعد ربط السحابة والمزامنة.';
     list.append(empty);
     return;
@@ -286,7 +293,7 @@ function renderShifts(){
     const sales=shift.sales||[];
     const activeSales=sales.filter(sale=>!sale.voided);
     const card=document.createElement('article');
-    card.className='card shift';
+    card.className=`shift ${open?'open':''}`;
     const expanded=selectedShiftId===shift.id;
     card.innerHTML=`
       <div class="shift-head">
@@ -298,8 +305,8 @@ function renderShifts(){
         </div>
         <div class="shift-actions">
           <span class="pill">${activeSales.length} فواتير</span>
-          ${open?`<button class="danger close-shift">إغلاق</button>`:''}
-          <button class="secondary toggle-details">${expanded?'إخفاء التفاصيل':'عرض كل التفاصيل'}</button>
+          ${open?`<button class="btn danger close-shift" type="button">إغلاق الوردية</button>`:''}
+          <button class="btn ghost toggle-details" type="button">${expanded?'إخفاء التفاصيل':'عرض التفاصيل'}</button>
         </div>
       </div>
       ${expanded?`
@@ -327,17 +334,71 @@ function renderShifts(){
   });
 }
 
+function renderAccountsPanel(){
+  const panel=$('accountsPanel');
+  const label=$('accountsMonthLabel');
+  if(!panel)return;
+  const summary=accountsSummary;
+  if(label)label.textContent=summary?.month_label||'';
+  if(!summary||!summary.month){
+    panel.innerHTML='<article class="empty-card">أرقام الحسابات تظهر هنا بعد مزامنة جهاز الكاشير (إجمالي المبيعات، الربح، والتارجت).</article>';
+    return;
+  }
+  const profit=Number(summary.net||0)>=0;
+  const dayTarget=Number(summary.day_target||0);
+  const avgDaily=Number(summary.avg_daily||0);
+  const breakEven=Number(summary.break_even_day||0);
+  const maxScale=Math.max(avgDaily,dayTarget,breakEven,1)*1.35;
+  const fill=Math.min(100,avgDaily/maxScale*100);
+  const bePos=Math.min(98,Math.max(1,breakEven/maxScale*100));
+  panel.innerHTML=`
+    <article class="accounts-hero ${profit?'profit':'loss'}">
+      <div>
+        <div class="lbl">صافي الربح الشهري</div>
+        <div class="val">${money(summary.net)}</div>
+      </div>
+      <span class="status-pill">${profit?'ربح':'خسارة'}</span>
+    </article>
+    <div class="accounts-stats">
+      <article class="mini-kpi kpi-card tone-sales"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16l5-5 4 3 7-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>إجمالي المبيعات</span><strong>${money(summary.sales)}</strong></article>
+      <article class="mini-kpi kpi-card tone-profit"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M7 8h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>ربح المبيعات</span><strong>${money(summary.profit)}</strong></article>
+      <article class="mini-kpi kpi-card tone-loss"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M7 7l1 13h8l1-13M9 7V5h6v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>المصاريف الثابتة</span><strong>${money(summary.expenses)}</strong></article>
+      <article class="mini-kpi kpi-card tone-target"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></div><span>تارجت اليوم</span><strong>${Number(summary.day_target||0).toLocaleString('ar-EG')}</strong></article>
+      <article class="mini-kpi kpi-card tone-invoices"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19V6h14v13l-7-3-7 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span>تارجت الشهر</span><strong>${Number(summary.month_target||0).toLocaleString('ar-EG')}</strong></article>
+      <article class="mini-kpi kpi-card tone-shifts"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h14M7 16V8m5 8V5m5 11v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>نقطة التعادل</span><strong>${Number(summary.break_even_day||0).toLocaleString('ar-EG',{maximumFractionDigits:1})}</strong></article>
+    </div>
+    <div class="meter-wrap">
+      <p class="muted">البيع اليومي الفعلي ${Number(avgDaily).toLocaleString('ar-EG',{maximumFractionDigits:1})} / التارجت ${dayTarget||'—'} منتج في اليوم</p>
+      <svg class="meter-svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+        <rect width="100" height="8" rx="4" fill="#0f172a"></rect>
+        <rect width="${fill.toFixed(1)}" height="8" rx="4" fill="#2dd4bf"></rect>
+        <rect x="${bePos.toFixed(1)}" y="0" width="1.6" height="8" fill="#fb7185"></rect>
+      </svg>
+      <div class="acc-meter-scale"><span>0</span><span>${Math.round(maxScale)}</span></div>
+    </div>
+  `;
+}
+
+async function loadAccountsSummary(){
+  try{
+    const rows=await request('/rest/v1/activity_events?event_type=eq.accounts_summary&select=details,happened_at&order=happened_at.desc&limit=1');
+    const details=rows&&rows[0]&&rows[0].details;
+    if(details&&typeof details==='object')return details;
+  }catch(_error){}
+  return liveFeed.accounts_summary&&liveFeed.accounts_summary.month?liveFeed.accounts_summary:null;
+}
+
 function renderFeed(){
   const today=liveFeed.today||{};
   const all=liveFeed.all||{};
   $('todaySales').textContent=money(today.sales_total);
   $('todayCount').textContent=String(today.invoice_count||0);
   $('openCount').textContent=String(today.open_shifts||0);
-  $('onlineCount').textContent=String((liveFeed.cashiers||[]).filter(cashier=>cashier.online).length);
+  $('onlineCount').textContent=String((liveFeed.cashiers||[]).filter(cashier=>cashier.online && cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__').length);
   const hint=$('historyHint');
   if(hint){
     if(all.invoice_count){
-      hint.textContent=`كل الفواتير المرفوعة من أجهزة الكاشير: ${all.invoice_count} فاتورة — ${money(all.sales_total)}`;
+      hint.textContent=`كل الفواتير المرفوعة: ${all.invoice_count} فاتورة — ${money(all.sales_total)}`;
     }else{
       hint.textContent='ما في فواتير مرفوعة للسحابة بعد. افتحي برنامج الكاشير على الجهاز اللي حصل فيه البيع، اربطي السحابة من الإعدادات بنفس الإيميل، ثم اضغطي مزامنة الآن.';
     }
@@ -345,6 +406,7 @@ function renderFeed(){
   renderCashierFilter();
   renderCashiers();
   renderShifts();
+  renderAccountsPanel();
 }
 
 async function loadHistory(){
@@ -404,6 +466,7 @@ async function refresh(){
     liveFeed=await request('/rest/v1/rpc/manager_live_feed',{method:'POST',body:'{}'});
     const history=await loadHistory();
     liveFeed=mergeHistory(liveFeed, history);
+    accountsSummary=await loadAccountsSummary();
     currency=liveFeed.currency||currency;
     if(liveFeed.shop_name)$('shopName').textContent=liveFeed.shop_name;
     renderFeed();
@@ -469,5 +532,5 @@ localStorage.removeItem('managerSession');
 session=null;
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=9').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=11').catch(()=>{});
 }

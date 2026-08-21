@@ -3,66 +3,132 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#2b1c33">
+  <meta name="theme-color" content="#0b1220">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
-  <title>متابعة الكاشير</title>
+  <title>لوحة المدير</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
+  <div class="app-bg" aria-hidden="true"></div>
   <main>
-    <section id="loginView" class="card login">
-      <div class="logo">📊</div>
-      <h1>لوحة المدير</h1>
-      <p>سجّل الدخول لمتابعة المحل من أي مكان</p>
-      <form id="loginForm" autocomplete="off">
-        <label>البريد الإلكتروني<input id="email" name="email" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="manager.demo.2026@example.com" required></label>
-        <label>كلمة المرور<input id="password" name="password" type="password" autocomplete="new-password" required></label>
-        <button type="button" id="loginButton">دخول</button>
-      </form>
-      <div id="loginError" class="error"></div>
+    <section id="loginView" class="login-wrap">
+      <article class="login-card">
+        <div class="brand-mark lg" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V9l8-5 8 5v10" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 19v-6h6v6" stroke="currentColor" stroke-width="1.8"/></svg>
+        </div>
+        <p class="eyebrow">متابعة المحل</p>
+        <h1>لوحة المدير</h1>
+        <p class="lead">سجّلي الدخول لمتابعة المبيعات والكاشير من أي مكان</p>
+        <form id="loginForm" autocomplete="off">
+          <label>البريد الإلكتروني
+            <input id="email" name="email" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="royal@plaza.com" required>
+          </label>
+          <label>كلمة المرور
+            <input id="password" name="password" type="password" autocomplete="new-password" required>
+          </label>
+          <button type="button" id="loginButton" class="btn primary block">دخول اللوحة</button>
+        </form>
+        <div id="loginError" class="error"></div>
+      </article>
     </section>
 
-    <section id="dashboard" class="hidden">
-      <header>
-        <div><small>متابعة حية</small><h1 id="shopName">المحل</h1></div>
+    <section id="dashboard" class="hidden dashboard">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V9l8-5 8 5v10" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 19v-6h6v6" stroke="currentColor" stroke-width="1.8"/></svg>
+          </div>
+          <div>
+            <small>لوحة التحكم الحية</small>
+            <h1 id="shopName">المحل</h1>
+          </div>
+        </div>
         <div class="header-actions">
-          <span id="liveBadge" class="live-badge">تحديث تلقائي</span>
-          <button id="logoutButton" class="secondary">خروج</button>
+          <span id="liveBadge" class="live-badge"><i class="pulse"></i> مباشر</span>
+          <button id="refreshButton" class="btn ghost" type="button">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 5v4h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            تحديث
+          </button>
+          <button id="logoutButton" class="btn ghost" type="button">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="1.8"/><path d="M4 12h11M12 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            خروج
+          </button>
         </div>
       </header>
 
-      <div class="stats">
-        <article class="card"><span>مبيعات اليوم</span><strong id="todaySales">—</strong></article>
-        <article class="card"><span>فواتير اليوم</span><strong id="todayCount">—</strong></article>
-        <article class="card"><span>ورديات مفتوحة</span><strong id="openCount">—</strong></article>
-        <article class="card"><span>متصل الآن</span><strong id="onlineCount">—</strong></article>
-      </div>
+      <section class="kpi-row" aria-label="ملخص اليوم">
+        <article class="kpi-card tone-sales">
+          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 18V8m5 10V4m5 14v-7m5 7V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          <span>مبيعات اليوم</span>
+          <strong id="todaySales">—</strong>
+        </article>
+        <article class="kpi-card tone-invoices">
+          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3h8l4 4v14H7V3z" stroke="currentColor" stroke-width="1.8"/><path d="M10 11h6M10 15h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          <span>فواتير اليوم</span>
+          <strong id="todayCount">—</strong>
+        </article>
+        <article class="kpi-card tone-shifts">
+          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          <span>ورديات مفتوحة</span>
+          <strong id="openCount">—</strong>
+        </article>
+        <article class="kpi-card tone-online">
+          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M5 19c1.4-3 4-4.5 7-4.5S17.6 16 19 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          <span>متصل الآن</span>
+          <strong id="onlineCount">—</strong>
+        </article>
+      </section>
 
-      <p class="hint">هذه المتابعة تعرض عمليات العمل وآخر نشاط مسجّل، وليست بثاً لشاشة الجهاز.</p>
       <p id="historyHint" class="hint"></p>
 
-      <div class="section-title">
-        <h2>الكاشير الآن</h2>
-        <div class="toolbar">
-          <select id="cashierFilter" aria-label="تصفية حسب الكاشير">
-            <option value="all">كل الكاشيرات</option>
-          </select>
-          <button id="refreshButton" class="secondary">تحديث</button>
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>الحسابات هذا الشهر</h2>
+            <p class="panel-sub">إجمالي المبيعات، الربح، والتارجت</p>
+          </div>
+          <span id="accountsMonthLabel" class="chip"></span>
         </div>
-      </div>
-      <div id="cashierList" class="cashier-list"></div>
+        <div id="accountsPanel"></div>
+      </section>
 
-      <div class="section-title">
-        <h2>الورديات والمبيعات</h2>
-      </div>
-      <div id="shiftList" class="shift-list"></div>
-      <p id="lastRefresh" class="muted"></p>
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>الكاشير الآن</h2>
+            <p class="panel-sub">آخر نشاط على أجهزة البيع</p>
+          </div>
+          <div class="toolbar">
+            <label class="select-wrap">
+              <span class="sr-only">تصفية حسب الكاشير</span>
+              <select id="cashierFilter" aria-label="تصفية حسب الكاشير">
+                <option value="all">كل الكاشيرات</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div id="cashierList" class="cashier-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>الورديات والمبيعات</h2>
+            <p class="panel-sub">الفواتير، الدرج، وإغلاق الوردية عن بُعد</p>
+          </div>
+        </div>
+        <div id="shiftList" class="shift-list"></div>
+        <p id="lastRefresh" class="muted last-refresh"></p>
+      </section>
     </section>
   </main>
 
   <dialog id="closeDialog">
     <form id="closeForm" method="dialog">
+      <div class="dialog-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
       <h2>إغلاق الوردية عن بُعد</h2>
       <p id="closeShiftName"></p>
       <label>النقدية الفعلية في الدرج (اختياري)
@@ -70,14 +136,14 @@
       </label>
       <label>سبب الإغلاق<input id="closeReason" maxlength="200" placeholder="مثال: نهاية اليوم"></label>
       <div class="dialog-actions">
-        <button type="button" id="cancelClose" class="secondary">تراجع</button>
-        <button type="submit" class="danger">تأكيد الإغلاق</button>
+        <button type="button" id="cancelClose" class="btn ghost">تراجع</button>
+        <button type="submit" class="btn danger">تأكيد الإغلاق</button>
       </div>
       <div id="closeError" class="error"></div>
     </form>
   </dialog>
 
-  <script src="boot.js?v=9"></script>
-  <script type="module" src="app.js?v=9"></script>
+  <script src="boot.js?v=11"></script>
+  <script type="module" src="app.js?v=11"></script>
 </body>
 </html>
