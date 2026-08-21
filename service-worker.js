@@ -1,4 +1,4 @@
-const CACHE = 'shop-pos-manager-v15';
+const CACHE = 'shop-pos-manager-v16';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './boot.js', './config.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {

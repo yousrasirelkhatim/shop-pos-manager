@@ -9,7 +9,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
   <div class="app-bg" aria-hidden="true"></div>
@@ -21,7 +21,7 @@
         </div>
         <p class="eyebrow">متابعة المحل</p>
         <h1>لوحة المدير</h1>
-        <p class="lead">سجّلي الدخول لمتابعة المبيعات والكاشير من أي مكان</p>
+        <p class="lead">أدخل البريد وكلمة المرور لمتابعة المحل من أي مكان</p>
         <form id="loginForm" autocomplete="off">
           <label>البريد الإلكتروني
             <input id="email" name="email" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="royal@plaza.com" required>
@@ -100,7 +100,7 @@
           <div class="panel-head">
             <div>
               <h2>محطات الكاشير</h2>
-              <p class="panel-sub">المتصلون أولاً، مع مبيعات الوردية الحالية</p>
+              <p class="panel-sub">اضغط الكاشير لعرض فواتيره فقط</p>
             </div>
           </div>
           <div id="cashierTabs" class="filter-tabs"></div>
@@ -114,17 +114,61 @@
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h2>الورديات والمبيعات</h2>
-            <p class="panel-sub">الفواتير، الدرج، وإغلاق الوردية عن بُعد</p>
+            <h2>الورديات الحالية</h2>
+            <p class="panel-sub">ملخص الدرج وإغلاق الوردية عن بُعد</p>
           </div>
         </div>
         <div id="openShifts" class="shift-board"></div>
-        <h3 class="board-title" id="closedTitle">ورديات سابقة</h3>
-        <div id="shiftList" class="shift-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>سجل الفواتير</h2>
+            <p class="panel-sub">ابحث برقم الفاتورة أو اسم الكاشير أو الصنف</p>
+          </div>
+          <span id="invoiceCount" class="chip">0 فاتورة</span>
+        </div>
+        <div class="invoice-toolbar">
+          <input id="invoiceSearch" type="search" placeholder="بحث: رقم الفاتورة، الكاشير، أو الصنف" autocomplete="off">
+          <select id="invoicePay" aria-label="تصفية طريقة الدفع">
+            <option value="all">كل الفواتير</option>
+            <option value="cash">نقدي</option>
+            <option value="card">بطاقة</option>
+            <option value="voided">ملغاة</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>رقم الفاتورة</th>
+                <th>الوقت</th>
+                <th>الكاشير</th>
+                <th>الدفع</th>
+                <th>المبلغ</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="invoiceRows"></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <button id="prevPage" class="btn ghost" type="button">السابق</button>
+          <span id="pageInfo" class="muted">—</span>
+          <button id="nextPage" class="btn ghost" type="button">التالي</button>
+        </div>
         <p id="lastRefresh" class="muted last-refresh"></p>
       </section>
     </section>
   </main>
+
+  <dialog id="invoiceDialog">
+    <form method="dialog" class="invoice-dialog">
+      <div id="invoiceDialogBody"></div>
+      <button type="submit" class="btn ghost block" value="close">إغلاق</button>
+    </form>
+  </dialog>
 
   <dialog id="closeDialog">
     <form id="closeForm" method="dialog">
@@ -145,7 +189,7 @@
     </form>
   </dialog>
 
-  <script src="boot.js?v=15"></script>
-  <script type="module" src="app.js?v=15"></script>
+  <script src="boot.js?v=16"></script>
+  <script type="module" src="app.js?v=16"></script>
 </body>
 </html>

@@ -34,6 +34,8 @@ let currency = 'ج.م';
 let refreshTimer = null;
 let liveFeed = { cashiers: [], shifts: [], today: {} };
 let cashierFilter = 'all';
+let invoicePage = 1;
+const INVOICE_PAGE = 10;
 let accountsSummary = null;
 
 function configured(){
@@ -252,9 +254,11 @@ function renderCashierFilter(){
   tabs.querySelectorAll('.tab').forEach(button=>{
     button.addEventListener('click',()=>{
       cashierFilter=button.getAttribute('data-filter')||'all';
+      invoicePage=1;
       renderCashierFilter();
       renderCashiers();
       renderShifts();
+      renderInvoices();
     });
   });
 }
@@ -266,19 +270,18 @@ function renderCashiers(){
   if(!cashiers.length){
     const empty=document.createElement('article');
     empty.className='empty-card';
-    empty.textContent='لا توجد محطة ظاهرة بعد. من جهاز الكاشير اربطي السحابة ثم اتركي البرنامج مفتوحاً؛ التحديث يتم تلقائياً.';
+    empty.textContent='لا يوجد كاشير متصل حالياً. اترك برنامج الكاشير مفتوحاً وهو مربوط بالسحابة.';
     list.append(empty);
     return;
   }
   cashiers.forEach(cashier=>{
-    if(cashierFilter!=='all' && cashier.employee_id!==cashierFilter && cashier.employee_name!==cashierFilter)return;
     const shift=matchingShift(cashier);
     const sales=(shift?.sales||[]).filter(sale=>!sale.voided);
     const total=sales.reduce((sum,sale)=>sum+Number(sale.total||0),0);
     const cart=Number(cashier.details?.itemCount||0);
     const name=cashier.employee_name||'موظف';
     const card=document.createElement('article');
-    card.className=`cashier ${cashier.online?'online':'offline'}`;
+    card.className=`cashier ${cashier.online?'online':'offline'} ${cashierFilter!=='all'&&(cashier.employee_id===cashierFilter||cashier.employee_name===cashierFilter)?'active-filter':''}`;
     card.innerHTML=`
       <div class="cashier-head">
         <div class="identity">
@@ -299,31 +302,112 @@ function renderCashiers(){
       </div>
     `;
     list.append(card);
+    card.addEventListener('click',()=>{
+      const value=cashier.employee_id||cashier.employee_name;
+      cashierFilter=cashierFilter===value?'all':value;
+      invoicePage=1;
+      renderCashierFilter();
+      renderCashiers();
+      renderShifts();
+      renderInvoices();
+    });
   });
 }
 
-function saleCard(sale){
+function shortTime(value){
+  if(!value)return '—';
+  return new Date(value).toLocaleString('ar-EG',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function paymentLabel(sale){
+  if(sale?.voided)return 'ملغاة';
+  return sale?.payment==='card'?'بطاقة':'نقدي';
+}
+
+function allInvoices(){
+  const list=[];
+  for(const shift of liveFeed.shifts||[]){
+    for(const sale of shift.sales||[]){
+      list.push({...sale, shift_status:shift.status, shift_name:shift.employee_name});
+    }
+  }
+  return list.sort((a,b)=>new Date(b.sold_at||0)-new Date(a.sold_at||0));
+}
+
+function filteredInvoices(){
+  const query=(($('invoiceSearch')&&$('invoiceSearch').value)||'').trim().toLowerCase();
+  const pay=($('invoicePay')&&$('invoicePay').value)||'all';
+  return allInvoices().filter(sale=>{
+    if(cashierFilter!=='all' && sale.employee_id!==cashierFilter && sale.employee_name!==cashierFilter)return false;
+    if(pay==='voided' && !sale.voided)return false;
+    if(pay==='cash' && (sale.voided || sale.payment!=='cash'))return false;
+    if(pay==='card' && (sale.voided || sale.payment!=='card'))return false;
+    if(!query)return true;
+    const items=(sale.items||[]).map(item=>item.name||'').join(' ');
+    return String(sale.invoice_no||'').includes(query)
+      || String(sale.employee_name||'').toLowerCase().includes(query)
+      || items.toLowerCase().includes(query);
+  });
+}
+
+function openInvoice(sale){
+  const body=$('invoiceDialogBody');
+  const dialog=$('invoiceDialog');
+  if(!body||!dialog)return;
   const items=(sale.items||[]).map(item=>
     `<li><span>${escapeHtml(item.name)} × ${escapeHtml(item.quantity)}</span><strong>${money(item.line_total)}</strong></li>`
-  ).join('')||'<li>لا توجد أصناف محفوظة لهذه الفاتورة بعد</li>';
-  return `
-    <article class="sale ${sale.voided?'voided':''}">
-      <div class="sale-head">
-        <h4>فاتورة #${sale.invoice_no||'—'}</h4>
-        <span class="status-pill">${sale.voided?'ملغاة':(sale.payment==='card'?'فيزا':'نقدي')}</span>
-      </div>
-      <p>${formatTime(sale.sold_at)} — الكاشير: ${escapeHtml(sale.employee_name||'—')}</p>
-      <ul class="items">${items}</ul>
-      <div class="totals">
-        <span>فرعي ${money(sale.subtotal)}</span>
-        <span>خصم ${money(sale.discount)}</span>
-        <span>ضريبة ${money(sale.tax)}</span>
-        <strong>الإجمالي ${money(sale.total)}</strong>
-      </div>
-      <p>المدفوع ${money(sale.paid)} — الباقي ${money(sale.change_due)}</p>
-      ${sale.voided?`<p class="void">ألغاها ${escapeHtml(sale.voided_by||'—')} — ${escapeHtml(sale.void_reason||'بدون سبب')}</p>`:''}
-    </article>
+  ).join('')||'<li>لا توجد أصناف محفوظة</li>';
+  body.innerHTML=`
+    <h2>فاتورة رقم ${sale.invoice_no||'—'}</h2>
+    <p class="muted">${shortTime(sale.sold_at)} — ${escapeHtml(sale.employee_name||'—')}</p>
+    <p><span class="status-pill">${paymentLabel(sale)}</span></p>
+    <ul class="items">${items}</ul>
+    <div class="totals">
+      <span>المجموع الفرعي ${money(sale.subtotal)}</span>
+      <span>الخصم ${money(sale.discount)}</span>
+      <span>الضريبة ${money(sale.tax)}</span>
+      <strong>الإجمالي ${money(sale.total)}</strong>
+    </div>
+    <p>المدفوع ${money(sale.paid)} — الباقي ${money(sale.change_due)}</p>
+    ${sale.voided?`<p class="void">أُلغيت بواسطة ${escapeHtml(sale.voided_by||'—')} — ${escapeHtml(sale.void_reason||'بدون سبب')}</p>`:''}
   `;
+  dialog.showModal();
+}
+
+function renderInvoices(){
+  const rows=$('invoiceRows');
+  if(!rows)return;
+  const list=filteredInvoices();
+  const pages=Math.max(1,Math.ceil(list.length/INVOICE_PAGE));
+  if(invoicePage>pages)invoicePage=pages;
+  if(invoicePage<1)invoicePage=1;
+  const start=(invoicePage-1)*INVOICE_PAGE;
+  const page=list.slice(start,start+INVOICE_PAGE);
+  const count=$('invoiceCount');
+  if(count)count.textContent=`${list.length} فاتورة`;
+  const info=$('pageInfo');
+  if(info)info.textContent=list.length?`صفحة ${invoicePage} من ${pages}`:'لا توجد فواتير مطابقة';
+  const prev=$('prevPage');
+  const next=$('nextPage');
+  if(prev)prev.disabled=invoicePage<=1;
+  if(next)next.disabled=invoicePage>=pages;
+  if(!page.length){
+    rows.innerHTML='<tr><td colspan="6" class="empty-cell">لا توجد فواتير ضمن هذا البحث. غيّر كلمة البحث أو التصفية.</td></tr>';
+    return;
+  }
+  rows.innerHTML=page.map((sale,index)=>`
+    <tr class="${sale.voided?'voided':''}" data-index="${start+index}">
+      <td><strong>#${sale.invoice_no||'—'}</strong></td>
+      <td>${shortTime(sale.sold_at)}</td>
+      <td>${escapeHtml(sale.employee_name||'—')}</td>
+      <td><span class="status-pill">${paymentLabel(sale)}</span></td>
+      <td><strong>${money(sale.total)}</strong></td>
+      <td><button type="button" class="btn ghost compact view-invoice">التفاصيل</button></td>
+    </tr>
+  `).join('');
+  rows.querySelectorAll('.view-invoice').forEach((button,offset)=>{
+    button.addEventListener('click',()=>openInvoice(page[offset]));
+  });
 }
 
 function shiftCard(shift){
@@ -333,64 +417,53 @@ function shiftCard(shift){
   const total=activeSales.reduce((sum,sale)=>sum+Number(sale.total||0),0);
   const card=document.createElement('article');
   card.className=`shift ${open?'open':''}`;
-  const expanded=selectedShiftId===shift.id;
   card.innerHTML=`
     <div class="shift-head">
       <div>
         <h3>${escapeHtml(shift.employee_name)}</h3>
-        <p>${open?'وردية مفتوحة':'أُغلقت'} — ${formatTime(shift.opened_at)}</p>
-        <p class="expected">الدرج المتوقع: ${money(shift.expected_cash)}</p>
-        <p>مبيعات الوردية: <strong>${money(total)}</strong></p>
+        <p>${open?'وردية مفتوحة':'وردية مغلقة'} — ${shortTime(shift.opened_at)}</p>
+        <p class="expected">المتوقع في الدرج: ${money(shift.expected_cash)}</p>
       </div>
       <div class="shift-actions">
-        <span class="pill">${activeSales.length} فواتير</span>
-        ${open?`<button class="btn danger close-shift" type="button">إغلاق</button>`:''}
-        <button class="btn ghost toggle-details" type="button">${expanded?'إخفاء':'التفاصيل'}</button>
+        <span class="pill">${activeSales.length} فاتورة</span>
+        <strong>${money(total)}</strong>
+        ${open?`<button class="btn danger close-shift" type="button">إغلاق الوردية</button>`:''}
+        <button class="btn ghost show-shift-invoices" type="button">فواتير الكاشير</button>
       </div>
     </div>
-    ${expanded?`
-      <div class="details">
-        <h4>الفواتير والأصناف</h4>
-        ${sales.length?sales.map(saleCard).join(''):'<p class="muted">لا توجد فواتير في هذه الوردية</p>'}
-        <h4>حركات الدرج</h4>
-        ${(shift.movements||[]).length
-          ?(shift.movements||[]).map(move=>`<p>${move.movement_type==='out'?'سحب':'إيداع'} ${money(move.amount)} — ${move.note||'بدون ملاحظة'} — ${formatTime(move.happened_at)}</p>`).join('')
-          :'<p class="muted">لا توجد حركات درج</p>'}
-      </div>
-    `:''}
   `;
-  card.querySelector('.toggle-details').addEventListener('click',()=>{
-    selectedShiftId=expanded?null:shift.id;
-    renderShifts();
-  });
   const closeButton=card.querySelector('.close-shift');
-  if(closeButton)closeButton.addEventListener('click',()=>openCloseDialog(shift));
+  if(closeButton)closeButton.addEventListener('click',event=>{
+    event.stopPropagation();
+    openCloseDialog(shift);
+  });
+  card.querySelector('.show-shift-invoices').addEventListener('click',event=>{
+    event.stopPropagation();
+    cashierFilter=shift.employee_id||shift.employee_name||'all';
+    invoicePage=1;
+    renderCashierFilter();
+    renderCashiers();
+    renderShifts();
+    renderInvoices();
+    $('invoiceSearch')?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
   return card;
 }
 
 function renderShifts(){
   const openBox=$('openShifts');
-  const closedBox=$('shiftList');
-  const title=$('closedTitle');
   const shifts=filteredShifts();
   const open=shifts.filter(shift=>shift.status==='open');
-  const closed=shifts.filter(shift=>shift.status!=='open');
-  if(openBox){
-    openBox.replaceChildren();
-    if(!open.length){
-      const empty=document.createElement('article');
-      empty.className='empty-card';
-      empty.textContent=shifts.length?'لا توجد وردية مفتوحة الآن.':'لا توجد ورديات مرفوعة بعد. البرنامج يرفعها تلقائياً وهو شغال ومتصل.';
-      openBox.append(empty);
-    }else{
-      open.forEach(shift=>openBox.append(shiftCard(shift)));
-    }
+  if(!openBox)return;
+  openBox.replaceChildren();
+  if(!open.length){
+    const empty=document.createElement('article');
+    empty.className='empty-card';
+    empty.textContent='لا توجد وردية مفتوحة الآن.';
+    openBox.append(empty);
+    return;
   }
-  if(closedBox){
-    closedBox.replaceChildren();
-    closed.forEach(shift=>closedBox.append(shiftCard(shift)));
-  }
-  if(title)title.classList.toggle('hidden', !closed.length);
+  open.forEach(shift=>openBox.append(shiftCard(shift)));
 }
 
 function renderAccountsPanel(){
@@ -473,15 +546,16 @@ function renderFeed(){
   const hint=$('historyHint');
   if(hint){
     if(all.invoice_count){
-      hint.textContent=`كل الفواتير المرفوعة: ${all.invoice_count} فاتورة — ${money(all.sales_total)}`;
+      hint.textContent=`${all.invoice_count} فاتورة مرفوعة — ${money(all.sales_total)}`;
     }else{
-      hint.textContent='ما في فواتير مرفوعة للسحابة بعد. افتحي برنامج الكاشير على الجهاز اللي حصل فيه البيع، اربطي السحابة من الإعدادات بنفس الإيميل، ثم اضغطي مزامنة الآن.';
+      hint.textContent='لم تُرفع فواتير بعد. اترك برنامج الكاشير مفتوحاً ومتصلاً بالسحابة.';
     }
   }
   renderCashierFilter();
   renderCashiers();
   renderShifts();
   renderAccountsPanel();
+  renderInvoices();
 }
 
 async function loadHistory(){
@@ -621,9 +695,13 @@ $('closeForm').addEventListener('submit',async event=>{
 $('cancelClose').addEventListener('click',()=>$('closeDialog').close());
 $('refreshButton').addEventListener('click',refresh);
 $('logoutButton').addEventListener('click',logout);
+if($('invoiceSearch'))$('invoiceSearch').addEventListener('input',()=>{invoicePage=1;renderInvoices();});
+if($('invoicePay'))$('invoicePay').addEventListener('change',()=>{invoicePage=1;renderInvoices();});
+if($('prevPage'))$('prevPage').addEventListener('click',()=>{invoicePage-=1;renderInvoices();});
+if($('nextPage'))$('nextPage').addEventListener('click',()=>{invoicePage+=1;renderInvoices();});
 
 restoreSession();
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=15').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=16').catch(()=>{});
 }
