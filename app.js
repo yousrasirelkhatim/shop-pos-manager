@@ -26,6 +26,8 @@ const EVENT_LABELS = {
 };
 
 let session = null;
+try { session = JSON.parse(localStorage.getItem('managerSession') || 'null'); } catch (_error) { session = null; }
+if (!session?.access_token) session = null;
 let selectedShift = null;
 let selectedShiftId = null;
 let currency = 'ج.م';
@@ -570,6 +572,23 @@ async function startLive(){
   refreshTimer=setInterval(refresh,8000);
 }
 
+async function restoreSession(){
+  if(!session?.access_token)return;
+  try{
+    await loadProfile();
+    await startLive();
+  }catch(_error){
+    try{
+      if(!session?.refresh_token)throw new Error('no refresh');
+      await refreshSession();
+      await loadProfile();
+      await startLive();
+    }catch(_refreshError){
+      logout();
+    }
+  }
+}
+
 window.__managerAppReady=true;
 window.__managerHandleLogin=handleLogin;
 window.__managerAfterLogin=async function(){
@@ -603,6 +622,8 @@ $('cancelClose').addEventListener('click',()=>$('closeDialog').close());
 $('refreshButton').addEventListener('click',refresh);
 $('logoutButton').addEventListener('click',logout);
 
+restoreSession();
+
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=14').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=15').catch(()=>{});
 }
