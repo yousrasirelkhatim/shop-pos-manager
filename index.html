@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles-20.css">
+  <link rel="stylesheet" href="styles-21.css">
 </head>
 <body>
   <div class="app-bg" aria-hidden="true"></div>
@@ -23,14 +23,12 @@
         <p class="eyebrow">متابعة المحل</p>
         <h1>لوحة المدير</h1>
         <p class="lead">أدخل البريد وكلمة المرور لمتابعة المحل من أي مكان</p>
-        <form id="loginForm" autocomplete="off" novalidate>
-          <input class="hidden" type="text" name="fake_user" tabindex="-1" aria-hidden="true" autocomplete="username">
-          <input class="hidden" type="password" name="fake_pass" tabindex="-1" aria-hidden="true" autocomplete="current-password">
+        <form id="loginForm" autocomplete="off" novalidate data-lpignore="true">
           <label>البريد الإلكتروني
-            <input id="email" name="manager_email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="royal@plaza.com" required readonly>
+            <input id="email" name="shop_user" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="royal@plaza.com" required>
           </label>
           <label>كلمة المرور
-            <input id="password" name="manager_key" type="password" autocomplete="off" required readonly>
+            <input id="password" name="shop_pin" type="text" class="secret-input" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" required>
           </label>
           <button type="submit" id="loginButton" class="btn primary block">دخول اللوحة</button>
         </form>
@@ -184,7 +182,7 @@
     </form>
   </dialog>
 
-  <script src="boot-20.js"></script>
-  <script type="module" src="app-20.js"></script>
+  <script src="boot-21.js"></script>
+  <script type="module" src="app-21.js"></script>
 </body>
 </html>
