@@ -509,30 +509,49 @@ function renderAccountsPanel(){
         <rect x="${bePos.toFixed(1)}" y="0" width="1.6" height="8" fill="#fb7185"></rect>
       </svg>
       <div class="acc-meter-scale"><span>0</span><span>${Math.round(maxScale)}</span></div>
-    </div>`:'<p class="hint">الربح والتارجت يكتملان بعد مزامنة واحدة من برنامج الكاشير المحدّث، ثم يتحدثان تلقائياً.</p>'}
+    </div>`:'<p class="hint">هذه المبيعات من الفواتير المرفوعة. الربح والتارجت يظهران بعد تثبيت برنامج الكاشير الجديد وفتحه وهو متصل.</p>'}
   `;
 }
 
-function summaryFromRecord(value){
-  const data=value&&typeof value==='object'?(value.details||value):null;
-  if(!data||typeof data!=='object')return null;
-  if(data.from_invoices)return null;
-  if(data.kind==='accounts_summary' || data.day_target!=null || data.net!=null && data.month){
-    return data;
+function parseDetails(value){
+  if(value==null)return null;
+  if(typeof value==='string'){
+    try{value=JSON.parse(value);}catch(_error){return null;}
   }
+  if(typeof value!=='object')return null;
+  if(value.details && (value.kind==null && value.month==null))return parseDetails(value.details);
+  return value;
+}
+
+function summaryFromRecord(value){
+  const data=parseDetails(value);
+  if(!data||data.from_invoices)return null;
+  if(data.kind==='accounts_summary' || (data.month && (data.profit!=null || data.net!=null || data.day_target!=null)))return data;
   return null;
 }
 
 async function loadAccountsSummary(){
   const fromLive=(liveFeed.cashiers||[]).map(summaryFromRecord).find(Boolean);
   if(fromLive)return fromLive;
-  try{
-    const rows=await request('/rest/v1/activity_events?or=(event_type.eq.accounts_summary,device_id.eq.__accounts__,view_name.eq.accounts)&select=details,event_type,view_name,device_id,happened_at&order=happened_at.desc&limit=30');
-    for(const row of rows||[]){
-      const summary=summaryFromRecord(row);
-      if(summary)return summary;
-    }
-  }catch(_error){}
+  const paths=[
+    '/rest/v1/activity_events?device_id=eq.__accounts__&select=details,happened_at&order=happened_at.desc&limit=5',
+    '/rest/v1/activity_events?view_name=eq.accounts&select=details,happened_at&order=happened_at.desc&limit=10',
+    '/rest/v1/profiles?select=shops(accounts_summary)'
+  ];
+  for(const path of paths){
+    try{
+      const rows=await request(path);
+      if(path.includes('profiles')){
+        const summary=summaryFromRecord(rows&&rows[0]&&rows[0].shops&&rows[0].shops.accounts_summary);
+        if(summary)return summary;
+        continue;
+      }
+      for(const row of rows||[]){
+        const summary=summaryFromRecord(row);
+        if(summary)return summary;
+      }
+    }catch(_error){}
+  }
   return summaryFromRecord(liveFeed.accounts_summary);
 }
 
@@ -703,5 +722,5 @@ if($('nextPage'))$('nextPage').addEventListener('click',()=>{invoicePage+=1;rend
 restoreSession();
 
 if('serviceWorker' in navigator && !location.pathname.includes('/functions/v1/')){
-  navigator.serviceWorker.register('./service-worker.js?v=16').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=17').catch(()=>{});
 }
