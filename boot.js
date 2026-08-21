@@ -8,12 +8,8 @@
   var errorEl = document.getElementById('loginError');
   var loginView = document.getElementById('loginView');
   var dashboard = document.getElementById('dashboard');
-  var saved = null;
-  try { saved = JSON.parse(localStorage.getItem('managerSession') || 'null'); } catch (_error) {}
-  if (saved && saved.access_token) {
-    if (loginView) loginView.classList.add('hidden');
-    if (dashboard) dashboard.classList.remove('hidden');
-  }
+  if (loginView) loginView.classList.remove('hidden');
+  if (dashboard) dashboard.classList.add('hidden');
   if (!form || !button) return;
 
   var busy = false;
