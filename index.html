@@ -6,10 +6,11 @@
   <meta name="theme-color" content="#0b1220">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>لوحة المدير</title>
+  <meta http-equiv="Cache-Control" content="no-store">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles-19.css">
 </head>
 <body>
   <div class="app-bg" aria-hidden="true"></div>
@@ -121,38 +122,30 @@
         <div id="openShifts" class="shift-board"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel invoices-panel">
         <div class="panel-head">
           <div>
             <h2>سجل الفواتير</h2>
-            <p class="panel-sub">ابحث برقم الفاتورة أو اسم الكاشير أو الصنف</p>
+            <p class="panel-sub">مرتبة حسب اليوم — اضغط الفاتورة لعرض الأصناف</p>
           </div>
           <span id="invoiceCount" class="chip">0 فاتورة</span>
         </div>
         <div class="invoice-toolbar">
-          <input id="invoiceSearch" type="search" placeholder="بحث: رقم الفاتورة، الكاشير، أو الصنف" autocomplete="off">
-          <select id="invoicePay" aria-label="تصفية طريقة الدفع">
-            <option value="all">كل الفواتير</option>
-            <option value="cash">نقدي</option>
-            <option value="card">بطاقة</option>
-            <option value="voided">ملغاة</option>
-          </select>
+          <input id="invoiceSearch" type="search" placeholder="رقم الفاتورة، الكاشير، أو الصنف" autocomplete="off">
         </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>رقم الفاتورة</th>
-                <th>الوقت</th>
-                <th>الكاشير</th>
-                <th>الدفع</th>
-                <th>المبلغ</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="invoiceRows"></tbody>
-          </table>
+        <div class="filter-tabs pay-tabs" id="payTabs">
+          <button type="button" class="tab active" data-pay="all">الكل</button>
+          <button type="button" class="tab" data-pay="cash">نقدي</button>
+          <button type="button" class="tab" data-pay="card">بطاقة</button>
+          <button type="button" class="tab" data-pay="voided">ملغاة</button>
         </div>
+        <select id="invoicePay" class="hidden" aria-hidden="true">
+          <option value="all">كل الفواتير</option>
+          <option value="cash">نقدي</option>
+          <option value="card">بطاقة</option>
+          <option value="voided">ملغاة</option>
+        </select>
+        <div id="invoiceFeed" class="invoice-feed"></div>
         <div class="pager">
           <button id="prevPage" class="btn ghost" type="button">السابق</button>
           <span id="pageInfo" class="muted">—</span>
@@ -189,7 +182,7 @@
     </form>
   </dialog>
 
-  <script src="boot.js?v=18"></script>
-  <script type="module" src="app.js?v=18"></script>
+  <script src="boot-19.js"></script>
+  <script type="module" src="app-19.js"></script>
 </body>
 </html>
