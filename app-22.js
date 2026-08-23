@@ -85,6 +85,12 @@ function escapeHtml(value){
 function money(value){
   return `${Number(value||0).toLocaleString('ar-EG',{maximumFractionDigits:2})} ${currency}`;
 }
+function formatInvoiceNo(value){
+  const n=Math.floor(Number(value)||0);
+  if(!n)return '';
+  if(n>=1000000)return Math.floor(n/1000000)+'-'+String(n%1000000).padStart(4,'0');
+  return String(n).padStart(4,'0');
+}
 
 function formatTime(value){
   if(!value)return '—';
@@ -106,8 +112,8 @@ function eventLabel(event){
   const details=event?.details||{};
   if(event?.event_type==='view_opened')return `${base}: ${VIEW_LABELS[event.view_name]||event.view_name||''}`.trim();
   if(event?.event_type==='cart_updated')return `${base} (${Number(details.itemCount||0)} أصناف)`;
-  if(event?.event_type==='sale_completed')return `${base} #${details.invoiceNo||''} — ${money(details.total)}`.trim();
-  if(event?.event_type==='sale_voided')return `${base} #${details.invoiceNo||''}`;
+  if(event?.event_type==='sale_completed')return `${base} #${formatInvoiceNo(details.invoiceNo)||details.invoiceNo||''} — ${money(details.total)}`.trim();
+  if(event?.event_type==='sale_voided')return `${base} #${formatInvoiceNo(details.invoiceNo)||details.invoiceNo||''}`;
   if(event?.event_type==='cash_movement')return `${base}: ${details.movementType==='out'?'سحب':'إيداع'} ${money(details.amount)}`;
   if(event?.event_type==='heartbeat' && event.view_name)return `${base} — ${VIEW_LABELS[event.view_name]||event.view_name}`;
   return base;
@@ -185,10 +191,18 @@ async function handleLogin(){
   }
 }
 
+function isShopMetaEvent(cashier){
+  return cashier.event_type==='accounts_summary'
+    || cashier.device_id==='__accounts__'
+    || cashier.device_id==='__catalog__'
+    || cashier.device_id==='__tombstones__'
+    || cashier.device_id==='__purchases__'
+    || cashier.device_id==='__accounting__'
+    || (cashier.details&& (cashier.details.kind==='shop_catalog' || cashier.details.kind==='shop_purchases' || cashier.details.kind==='shop_accounting' || cashier.details.kind==='shop_tombstones' || cashier.details.kind==='accounts_summary'));
+}
+
 function visibleCashiers(){
-  return (liveFeed.cashiers||[]).filter(cashier=>
-    cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__'
-  );
+  return (liveFeed.cashiers||[]).filter(cashier=>!isShopMetaEvent(cashier));
 }
 
 function currentMonthKey(){
@@ -211,6 +225,7 @@ function monthKeyFromIso(value){
 }
 
 function saleQty(sale){
+  if(sale?.item_qty!=null && sale.item_qty!=='') return Number(sale.item_qty)||0;
   return (sale.items||[]).reduce((sum,item)=>sum+Number(item.quantity||0),0);
 }
 
@@ -392,6 +407,7 @@ function filteredInvoices(){
     if(!query)return true;
     const items=(sale.items||[]).map(item=>item.name||'').join(' ');
     return String(sale.invoice_no||'').includes(query)
+      || formatInvoiceNo(sale.invoice_no).toLowerCase().includes(query)
       || String(sale.employee_name||'').toLowerCase().includes(query)
       || items.toLowerCase().includes(query);
   });
@@ -418,6 +434,10 @@ function paymentClass(sale){
 }
 
 function itemPreview(sale){
+  if(sale?.item_preview){
+    const extra=Number(sale.item_count||0)>2?` +${Number(sale.item_count)-2}`:'';
+    return `${sale.item_preview}${extra} · ${saleQty(sale)} قطعة`;
+  }
   const items=sale.items||[];
   if(!items.length)return `${saleQty(sale)||0} قطعة`;
   const names=items.slice(0,2).map(item=>item.name).join('، ');
@@ -425,19 +445,40 @@ function itemPreview(sale){
   return `${names}${extra} · ${saleQty(sale)} قطعة`;
 }
 
-function openInvoice(sale){
+async function loadSaleItems(sale){
+  if((sale.items||[]).length) return sale.items;
+  if(!sale?.source_id) return [];
+  try{
+    const loaded=await request('/rest/v1/rpc/manager_sale_items',{
+      method:'POST',
+      body:JSON.stringify({p_source_id:sale.source_id})
+    });
+    if(Array.isArray(loaded) && loaded.length) return loaded;
+  }catch(_error){}
+  try{
+    return await request(`/rest/v1/sale_items?select=name,price,quantity,line_total,product_id&sale_source_id=eq.${encodeURIComponent(sale.source_id)}`);
+  }catch(_error){
+    return [];
+  }
+}
+
+async function openInvoice(sale){
   const body=$('invoiceDialogBody');
   const dialog=$('invoiceDialog');
   if(!body||!dialog)return;
-  const items=(sale.items||[]).map(item=>
+  body.innerHTML='<p class="muted">جاري تحميل الأصناف…</p>';
+  dialog.showModal();
+  const items=await loadSaleItems(sale);
+  sale.items=items;
+  const rows=items.map(item=>
     `<li><span>${escapeHtml(item.name)} × ${escapeHtml(item.quantity)}</span><strong>${money(item.line_total)}</strong></li>`
   ).join('')||'<li>لا توجد أصناف محفوظة</li>';
   body.innerHTML=`
     <p class="receipt-kicker">فاتورة مبيعات</p>
-    <h2>رقم ${sale.invoice_no||'—'}</h2>
+    <h2>رقم ${formatInvoiceNo(sale.invoice_no)||sale.invoice_no||'—'}</h2>
     <p class="muted">${shortTime(sale.sold_at)} · ${escapeHtml(sale.employee_name||'—')}</p>
     <p><span class="pay-chip ${paymentClass(sale)}">${paymentLabel(sale)}</span></p>
-    <ul class="items">${items}</ul>
+    <ul class="items">${rows}</ul>
     <div class="totals">
       <span>المجموع الفرعي ${money(sale.subtotal)}</span>
       <span>الخصم ${money(sale.discount)}</span>
@@ -447,7 +488,6 @@ function openInvoice(sale){
     <p>المدفوع ${money(sale.paid)} — الباقي ${money(sale.change_due)}</p>
     ${sale.voided?`<p class="void">أُلغيت بواسطة ${escapeHtml(sale.voided_by||'—')} — ${escapeHtml(sale.void_reason||'بدون سبب')}</p>`:''}
   `;
-  dialog.showModal();
 }
 
 function renderInvoices(){
@@ -491,7 +531,7 @@ function renderInvoices(){
           <button type="button" class="inv-hit view-invoice" data-index="${global}">
             <strong class="inv-amount">${money(sale.total)}</strong>
             <div class="inv-body">
-              <b>فاتورة ${escapeHtml(sale.invoice_no||'—')}</b>
+              <b>فاتورة ${escapeHtml(formatInvoiceNo(sale.invoice_no)||sale.invoice_no||'—')}</b>
               <p>${escapeHtml(sale.employee_name||'—')} · ${escapeHtml(itemPreview(sale))}</p>
             </div>
             <div class="inv-aside">
@@ -659,7 +699,7 @@ function renderFeed(){
   $('todaySales').textContent=money(today.sales_total);
   $('todayCount').textContent=String(today.invoice_count||0);
   $('openCount').textContent=String(today.open_shifts||0);
-  $('onlineCount').textContent=String((liveFeed.cashiers||[]).filter(cashier=>cashier.online && cashier.event_type!=='accounts_summary' && cashier.device_id!=='__accounts__').length);
+  $('onlineCount').textContent=String((liveFeed.cashiers||[]).filter(cashier=>cashier.online && !isShopMetaEvent(cashier)).length);
   const hint=$('historyHint');
   if(hint){
     if(all.invoice_count){
