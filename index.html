@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles-22.css">
+  <link rel="stylesheet" href="styles-23.css">
 </head>
 <body>
   <div class="app-bg" aria-hidden="true"></div>
@@ -126,7 +126,7 @@
         <div class="panel-head">
           <div>
             <h2>سجل الفواتير</h2>
-            <p class="panel-sub">مرتبة حسب اليوم — اضغط الفاتورة لعرض الأصناف</p>
+            <p class="panel-sub">اختاري الشهر ثم اليوم — اضغطي الفاتورة لعرض الأصناف</p>
           </div>
           <span id="invoiceCount" class="chip">0 فاتورة</span>
         </div>
@@ -145,8 +145,18 @@
           <option value="card">بطاقة</option>
           <option value="voided">ملغاة</option>
         </select>
+        <div id="invoiceNav" class="invoice-nav">
+          <div class="invoice-nav-block">
+            <p class="invoice-nav-label">الشهر</p>
+            <div id="invoiceMonths" class="filter-tabs month-tabs" role="tablist" aria-label="الأشهر"></div>
+          </div>
+          <div class="invoice-nav-block">
+            <p class="invoice-nav-label">اليوم</p>
+            <div id="invoiceDays" class="filter-tabs day-tabs" role="tablist" aria-label="الأيام"></div>
+          </div>
+        </div>
         <div id="invoiceFeed" class="invoice-feed"></div>
-        <div class="pager">
+        <div id="invoicePager" class="pager">
           <button id="prevPage" class="btn ghost" type="button">السابق</button>
           <span id="pageInfo" class="muted">—</span>
           <button id="nextPage" class="btn ghost" type="button">التالي</button>
@@ -182,7 +192,7 @@
     </form>
   </dialog>
 
-  <script src="boot-22.js"></script>
-  <script type="module" src="app-22.js"></script>
+  <script src="boot-23.js"></script>
+  <script type="module" src="app-23.js"></script>
 </body>
 </html>
