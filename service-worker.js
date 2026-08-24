@@ -1,4 +1,4 @@
-const CACHE = 'shop-pos-manager-v28';
+const CACHE = 'shop-pos-manager-v29';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
