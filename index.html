@@ -3,34 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b1220">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>لوحة المدير</title>
   <meta http-equiv="Cache-Control" content="no-store">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles-25.css">
+  <link rel="stylesheet" href="styles-26.css">
 </head>
 <body>
-  <div class="app-bg" aria-hidden="true"></div>
   <main>
     <section id="loginView" class="login-wrap">
       <article class="login-card">
-        <div class="brand-mark lg" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V9l8-5 8 5v10" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 19v-6h6v6" stroke="currentColor" stroke-width="1.8"/></svg>
-        </div>
-        <p class="eyebrow">متابعة المحل</p>
-        <h1>لوحة المدير</h1>
-        <p class="lead">أدخل البريد وكلمة المرور لمتابعة المحل من أي مكان</p>
+        <p class="eyebrow">المحل</p>
+        <h1>متابعة من أي مكان</h1>
+        <p class="lead">بريد السحابة، مش رقم الكاشير</p>
         <form id="loginForm" autocomplete="off" novalidate data-lpignore="true">
-          <label>البريد الإلكتروني
+          <label>البريد
             <input id="email" name="shop_user" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="royal@plaza.com" required>
           </label>
           <label>كلمة المرور
             <input id="password" name="shop_pin" type="text" class="secret-input" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" required>
           </label>
-          <button type="submit" id="loginButton" class="btn primary block">دخول اللوحة</button>
+          <button type="submit" id="loginButton" class="btn primary block">دخول</button>
         </form>
         <div id="loginError" class="error"></div>
       </article>
@@ -39,130 +40,149 @@
     <section id="dashboard" class="hidden dashboard">
       <header class="topbar">
         <div class="brand">
-          <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V9l8-5 8 5v10" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 19v-6h6v6" stroke="currentColor" stroke-width="1.8"/></svg>
-          </div>
-          <div>
-            <small>لوحة التحكم الحية</small>
-            <h1 id="shopName">المحل</h1>
-          </div>
+          <span id="liveBadge" class="live-badge"><i class="pulse"></i> مباشر</span>
+          <h1 id="shopName">المحل</h1>
         </div>
         <div class="header-actions">
-          <span id="liveBadge" class="live-badge"><i class="pulse"></i> مباشر</span>
-          <button id="refreshButton" class="btn ghost" type="button">
+          <p id="lastRefresh" class="clock"></p>
+          <button id="refreshButton" class="icon-btn" type="button" aria-label="تحديث">
             <svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 5v4h-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            تحديث
           </button>
-          <button id="logoutButton" class="btn ghost" type="button">
+          <button id="logoutButton" class="icon-btn" type="button" aria-label="خروج">
             <svg viewBox="0 0 24 24" fill="none"><path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="1.8"/><path d="M4 12h11M12 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            خروج
           </button>
         </div>
       </header>
 
-      <section class="kpi-row" aria-label="ملخص اليوم">
-        <article class="kpi-card tone-sales">
-          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 18V8m5 10V4m5 14v-7m5 7V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-          <span>مبيعات اليوم</span>
-          <strong id="todaySales">—</strong>
-        </article>
-        <article class="kpi-card tone-invoices">
-          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3h8l4 4v14H7V3z" stroke="currentColor" stroke-width="1.8"/><path d="M10 11h6M10 15h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-          <span>فواتير اليوم</span>
-          <strong id="todayCount">—</strong>
-        </article>
-        <article class="kpi-card tone-shifts">
-          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-          <span>ورديات مفتوحة</span>
-          <strong id="openCount">—</strong>
-        </article>
-        <article class="kpi-card tone-online">
-          <div class="kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M5 19c1.4-3 4-4.5 7-4.5S17.6 16 19 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-          <span>متصل الآن</span>
-          <strong id="onlineCount">—</strong>
-        </article>
-      </section>
-
-      <p id="historyHint" class="hint"></p>
-
-      <div class="dash-grid">
-        <section class="panel accounts-panel">
-          <div class="panel-head">
-            <div>
-              <h2>الحسابات هذا الشهر</h2>
-              <p class="panel-sub">إجمالي المبيعات، الربح، والتارجت</p>
+      <div class="screens">
+        <section class="screen is-active" data-view="today">
+          <p id="todayInsight" class="insight">جاري قراءة المحل…</p>
+          <article class="hero">
+            <span>مبيعات اليوم</span>
+            <strong id="todaySales">—</strong>
+            <div class="hero-meta">
+              <span><b id="todayCount">—</b> فاتورة</span>
+              <span><b id="openCount">—</b> وردية</span>
+              <span><b id="onlineCount">—</b> متصل</span>
             </div>
-            <span id="accountsMonthLabel" class="chip"></span>
+          </article>
+          <p id="historyHint" class="hint"></p>
+          <div class="home-block">
+            <div class="block-head">
+              <h2>الكاشير الآن</h2>
+              <button type="button" class="text-link" data-goto="live">الكل</button>
+            </div>
+            <div id="homeLive" class="home-live"></div>
           </div>
-          <div id="accountsPanel"></div>
+          <div class="home-block">
+            <div class="block-head">
+              <h2>آخر فواتير</h2>
+              <button type="button" class="text-link" data-goto="invoices">السجل</button>
+            </div>
+            <div id="homeRecent" class="home-recent"></div>
+          </div>
         </section>
 
-        <section class="panel cashiers-panel">
-          <div class="panel-head">
-            <div>
-              <h2>محطات الكاشير</h2>
-              <p class="panel-sub">تاب الكل يعرض الجميع — تاب الكاشير يعرض محطته فقط</p>
+        <section class="screen" data-view="live">
+          <section class="panel cashiers-panel">
+            <div class="panel-head">
+              <div>
+                <h2>محطات الكاشير</h2>
+                <p class="panel-sub">الكل يعرض الجميع — تاب الاسم يعرض محطته فقط</p>
+              </div>
             </div>
-          </div>
-          <div id="cashierTabs" class="filter-tabs cashier-tabs" role="tablist" aria-label="الكاشيرات"></div>
-          <select id="cashierFilter" class="hidden" aria-hidden="true">
-            <option value="all">كل الكاشيرات</option>
-          </select>
-          <div id="cashierList" class="cashier-grid"></div>
+            <div id="cashierTabs" class="filter-tabs cashier-tabs" role="tablist" aria-label="الكاشيرات"></div>
+            <select id="cashierFilter" class="hidden" aria-hidden="true">
+              <option value="all">كل الكاشيرات</option>
+            </select>
+            <div id="cashierList" class="cashier-grid"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>الورديات</h2>
+                <p class="panel-sub">الدرج وإغلاق عن بُعد</p>
+              </div>
+            </div>
+            <div id="openShifts" class="shift-board"></div>
+          </section>
+        </section>
+
+        <section class="screen" data-view="invoices">
+          <section class="panel invoices-panel">
+            <div class="panel-head">
+              <div>
+                <h2>الفواتير</h2>
+                <p class="panel-sub">شهر، بعدين يوم، بعدين الفاتورة</p>
+              </div>
+              <span id="invoiceCount" class="chip">0</span>
+            </div>
+            <div class="invoice-toolbar">
+              <input id="invoiceSearch" type="search" placeholder="رقم، كاشير، أو صنف" autocomplete="off">
+            </div>
+            <div class="filter-tabs pay-tabs" id="payTabs">
+              <button type="button" class="tab active" data-pay="all">الكل</button>
+              <button type="button" class="tab" data-pay="cash">نقدي</button>
+              <button type="button" class="tab" data-pay="card">بطاقة</button>
+              <button type="button" class="tab" data-pay="voided">ملغاة</button>
+            </div>
+            <select id="invoicePay" class="hidden" aria-hidden="true">
+              <option value="all">كل الفواتير</option>
+              <option value="cash">نقدي</option>
+              <option value="card">بطاقة</option>
+              <option value="voided">ملغاة</option>
+            </select>
+            <div id="invoiceNav" class="invoice-nav">
+              <div class="invoice-nav-block">
+                <p class="invoice-nav-label">الشهر</p>
+                <div id="invoiceMonths" class="filter-tabs month-tabs" role="tablist" aria-label="الأشهر"></div>
+              </div>
+              <div class="invoice-nav-block">
+                <p class="invoice-nav-label">اليوم</p>
+                <div id="invoiceDays" class="filter-tabs day-tabs" role="tablist" aria-label="الأيام"></div>
+              </div>
+            </div>
+            <div id="invoiceFeed" class="invoice-feed"></div>
+            <div id="invoicePager" class="pager">
+              <button id="prevPage" class="btn ghost" type="button">السابق</button>
+              <span id="pageInfo" class="muted">—</span>
+              <button id="nextPage" class="btn ghost" type="button">التالي</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="screen" data-view="accounts">
+          <section class="panel accounts-panel">
+            <div class="panel-head">
+              <div>
+                <h2>الحسابات</h2>
+                <p class="panel-sub">الشهر الحالي</p>
+              </div>
+              <span id="accountsMonthLabel" class="chip"></span>
+            </div>
+            <div id="accountsPanel"></div>
+          </section>
         </section>
       </div>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>الورديات الحالية</h2>
-            <p class="panel-sub">ملخص الدرج وإغلاق الوردية عن بُعد</p>
-          </div>
-        </div>
-        <div id="openShifts" class="shift-board"></div>
-      </section>
-
-      <section class="panel invoices-panel">
-        <div class="panel-head">
-          <div>
-            <h2>سجل الفواتير</h2>
-            <p class="panel-sub">اختاري الشهر ثم اليوم — اضغطي الفاتورة لعرض الأصناف</p>
-          </div>
-          <span id="invoiceCount" class="chip">0 فاتورة</span>
-        </div>
-        <div class="invoice-toolbar">
-          <input id="invoiceSearch" type="search" placeholder="رقم الفاتورة، الكاشير، أو الصنف" autocomplete="off">
-        </div>
-        <div class="filter-tabs pay-tabs" id="payTabs">
-          <button type="button" class="tab active" data-pay="all">الكل</button>
-          <button type="button" class="tab" data-pay="cash">نقدي</button>
-          <button type="button" class="tab" data-pay="card">بطاقة</button>
-          <button type="button" class="tab" data-pay="voided">ملغاة</button>
-        </div>
-        <select id="invoicePay" class="hidden" aria-hidden="true">
-          <option value="all">كل الفواتير</option>
-          <option value="cash">نقدي</option>
-          <option value="card">بطاقة</option>
-          <option value="voided">ملغاة</option>
-        </select>
-        <div id="invoiceNav" class="invoice-nav">
-          <div class="invoice-nav-block">
-            <p class="invoice-nav-label">الشهر</p>
-            <div id="invoiceMonths" class="filter-tabs month-tabs" role="tablist" aria-label="الأشهر"></div>
-          </div>
-          <div class="invoice-nav-block">
-            <p class="invoice-nav-label">اليوم</p>
-            <div id="invoiceDays" class="filter-tabs day-tabs" role="tablist" aria-label="الأيام"></div>
-          </div>
-        </div>
-        <div id="invoiceFeed" class="invoice-feed"></div>
-        <div id="invoicePager" class="pager">
-          <button id="prevPage" class="btn ghost" type="button">السابق</button>
-          <span id="pageInfo" class="muted">—</span>
-          <button id="nextPage" class="btn ghost" type="button">التالي</button>
-        </div>
-        <p id="lastRefresh" class="muted last-refresh"></p>
-      </section>
+      <nav class="dock" aria-label="التنقل">
+        <button type="button" class="dock-btn active" data-view="today">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 10.5 12 4l8 6.5V20H4v-9.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          اليوم
+        </button>
+        <button type="button" class="dock-btn" data-view="live">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.1" stroke="currentColor" stroke-width="1.7"/><path d="M5 19c1.3-3 3.8-4.4 7-4.4S17.7 16 19 19" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          الكاشير
+        </button>
+        <button type="button" class="dock-btn" data-view="invoices">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M7 3h8l4 4v14H7V3z" stroke="currentColor" stroke-width="1.7"/><path d="M10 11h6M10 15h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          الفواتير
+        </button>
+        <button type="button" class="dock-btn" data-view="accounts">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 16l5-5 4 3 7-8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          الحسابات
+        </button>
+      </nav>
     </section>
   </main>
 
@@ -175,15 +195,12 @@
 
   <dialog id="closeDialog">
     <form id="closeForm" method="dialog">
-      <div class="dialog-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </div>
-      <h2>إغلاق الوردية عن بُعد</h2>
+      <h2>إغلاق الوردية</h2>
       <p id="closeShiftName"></p>
-      <label>النقدية الفعلية في الدرج (اختياري)
-        <input id="actualCash" type="number" min="0" step="0.01" placeholder="يُترك فارغاً للإغلاق على المتوقع">
+      <label>النقدية في الدرج
+        <input id="actualCash" type="number" min="0" step="0.01" placeholder="اختياري — فاضي = المتوقع">
       </label>
-      <label>سبب الإغلاق<input id="closeReason" maxlength="200" placeholder="مثال: نهاية اليوم"></label>
+      <label>السبب<input id="closeReason" maxlength="200" placeholder="نهاية اليوم"></label>
       <div class="dialog-actions">
         <button type="button" id="cancelClose" class="btn ghost">تراجع</button>
         <button type="submit" class="btn danger">تأكيد الإغلاق</button>
@@ -192,7 +209,7 @@
     </form>
   </dialog>
 
-  <script src="boot-25.js"></script>
-  <script type="module" src="app-25.js"></script>
+  <script src="boot-26.js"></script>
+  <script type="module" src="app-26.js"></script>
 </body>
 </html>
