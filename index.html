@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles-23.css">
+  <link rel="stylesheet" href="styles-24.css">
 </head>
 <body>
   <div class="app-bg" aria-hidden="true"></div>
@@ -101,10 +101,10 @@
           <div class="panel-head">
             <div>
               <h2>محطات الكاشير</h2>
-              <p class="panel-sub">اضغط الكاشير لعرض فواتيره فقط</p>
+              <p class="panel-sub">تاب الكل يعرض الجميع — تاب الكاشير يعرض محطته فقط</p>
             </div>
           </div>
-          <div id="cashierTabs" class="filter-tabs"></div>
+          <div id="cashierTabs" class="filter-tabs cashier-tabs" role="tablist" aria-label="الكاشيرات"></div>
           <select id="cashierFilter" class="hidden" aria-hidden="true">
             <option value="all">كل الكاشيرات</option>
           </select>
@@ -192,7 +192,7 @@
     </form>
   </dialog>
 
-  <script src="boot-23.js"></script>
-  <script type="module" src="app-23.js"></script>
+  <script src="boot-24.js"></script>
+  <script type="module" src="app-24.js"></script>
 </body>
 </html>
