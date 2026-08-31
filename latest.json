@@ -1,5 +1,5 @@
 {
-  "version": "1.3.0",
-  "notes": "مرتجع جزئي، طباعة حرارية ESC/POS، عروض، وتقارير أوضح في لوحة المدير.",
-  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.3.0/Shop.POS.Setup.1.3.0.exe"
+  "version": "1.4.0",
+  "notes": "ربط الخامات بالمخزون فقط، متوسط تكلفة الشراء، تارجت بالجنيه، وإقفال الشهر يثبت الأرقام.",
+  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.0/Shop.POS.Setup.1.4.0.exe"
 }
