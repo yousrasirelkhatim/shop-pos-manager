@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
-  "notes": "إصلاح تشغيل البرنامج بعد خطأ في الخروج من الحساب، مع تحسينات الحسابات والخامات.",
-  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.1/Shop.POS.Setup.1.4.1.exe"
+  "version": "1.4.2",
+  "notes": "فلتر فواتير المشتريات حسب اليوم والشهر، زي التقارير.",
+  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.2/Shop.POS.Setup.1.4.2.exe"
 }
