@@ -171,10 +171,19 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 .acc-meter-scale{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin:8px 0 0}
 .sales-break{margin:16px 0 18px}
 .sales-break h3{margin:0 0 10px;font-size:15px}
+.month-story{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+.story-card{padding:14px;border-radius:18px;background:var(--card);border:1px solid var(--line)}
+.story-card span{display:block;color:var(--muted);font-size:12px;font-weight:600}
+.story-card strong{display:block;margin-top:6px;font-size:17px;font-family:var(--display);line-height:1.35}
+.story-card p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.55}
 .rank-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.rank-list li{position:relative;display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--bg-2);border-radius:12px;overflow:hidden}
+.rank-list li{position:relative;display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 10px;background:var(--bg-2);border-radius:12px;overflow:hidden}
 .rank-list span,.rank-list b{position:relative;z-index:1}
+.rank-list b em{font-style:normal;color:var(--muted);font-size:12px;font-weight:650;margin-inline-start:6px}
 .rank-list i{position:absolute;inset:0 auto 0 0;background:var(--accent-dim);border-radius:12px}
+.mix-list{margin-bottom:12px}
+.mix-list .is-zero{opacity:.55}
+.mix-list .is-zero i{width:0}
 
 .filter-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
 .filter-tabs .tab{

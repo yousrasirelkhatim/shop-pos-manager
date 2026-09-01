@@ -868,25 +868,52 @@ function salesBreakdownHtml(){
   if(!sales.length)return '';
   const cash=sales.filter(sale=>sale.payment==='cash').reduce((sum,sale)=>sum+Number(sale.total||0),0);
   const card=sales.filter(sale=>sale.payment==='card').reduce((sum,sale)=>sum+Number(sale.total||0),0);
-  const counts={};
-  sales.forEach(sale=>{
-    (sale.items||[]).forEach(item=>{
-      const name=item.name||'صنف';
-      counts[name]=(counts[name]||0)+Number(item.quantity||item.qty||0);
-    });
-  });
-  const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const max=top[0]?top[0][1]:1;
-  return `
+  const Mix=typeof window!=='undefined'?window.AccountsMix:null;
+  if(!Mix){
+    return `
     <div class="sales-break">
       <h3>تفصيل مبيعات ${escapeHtml(monthLabel(month))}</h3>
       <div class="accounts-stats">
         <article class="mini-kpi"><span>نقدي</span><strong>${money(cash)}</strong></article>
         <article class="mini-kpi"><span>بطاقة</span><strong>${money(card)}</strong></article>
       </div>
-      ${top.length?`<ul class="rank-list">${top.map(([name,qty])=>`
-        <li><span>${escapeHtml(name)}</span><b>${Number(qty).toLocaleString('ar-EG')}</b>
-        <i style="width:${Math.max(8,(qty/max)*100)}%"></i></li>`).join('')}</ul>`:''}
+    </div>`;
+  }
+  const mix=Mix.monthProductMix(sales);
+  const outlook=Mix.monthOutlook(sales, month);
+  const max=Math.max(1, ...mix.families.map(row=>row.qty));
+  const pieces=Number(mix.pieces||0);
+  const share=mix.topFamily&&pieces?Math.round(mix.topFamily.qty/pieces*100):0;
+  const best=mix.best;
+  const fmt=value=>Number(value||0).toLocaleString('ar-EG',{maximumFractionDigits:1});
+  return `
+    <div class="sales-break">
+      <h3>تفصيل مبيعات ${escapeHtml(monthLabel(month))}</h3>
+      <div class="month-story">
+        <article class="story-card">
+          <span>الأكثر مبيعاً</span>
+          <strong>${best?escapeHtml(best.name):'—'}</strong>
+          <p>${best?`${fmt(best.qty)} قطعة · ${money(best.total)}`: 'ما في أصناف هذا الشهر'}
+          ${mix.topFamily&&share?`<br>${escapeHtml(mix.topFamily.label)} أخذ ${share}٪ من القطع`:''}</p>
+        </article>
+        <article class="story-card">
+          <span>توقّع ${escapeHtml(outlook.nextLabel||'الشهر الجاي')}</span>
+          <strong>${outlook.soldDays?money(outlook.forecast):'—'}</strong>
+          <p>${outlook.soldDays?`بنفس متوسط ${escapeHtml(monthLabel(month))} اليومي على ${fmt(outlook.nextDays)} يوم`:'لسه ما في إيقاع يومي كافي'}</p>
+        </article>
+      </div>
+      <ul class="mix-list rank-list">
+        ${mix.families.map(row=>`
+          <li class="${row.qty?'':'is-zero'}">
+            <span>${escapeHtml(row.label)}</span>
+            <b>${fmt(row.qty)}${row.qty||row.total?` <em>${money(row.total)}</em>`:''}</b>
+            <i style="width:${row.qty?Math.max(8,(row.qty/max)*100):0}%"></i>
+          </li>`).join('')}
+      </ul>
+      <div class="accounts-stats">
+        <article class="mini-kpi"><span>نقدي</span><strong>${money(cash)}</strong></article>
+        <article class="mini-kpi"><span>بطاقة</span><strong>${money(card)}</strong></article>
+      </div>
     </div>`;
 }
 
