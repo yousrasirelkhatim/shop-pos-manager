@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles-30.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
@@ -26,10 +26,10 @@
         <p class="lead">بريد السحابة، مش رقم الكاشير</p>
         <form id="loginForm" autocomplete="off" novalidate data-lpignore="true">
           <label>البريد
-            <input id="email" name="shop_user" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="royal@plaza.com" required>
+            <input id="email" name="shop_user" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="البريد" required>
           </label>
           <label>كلمة المرور
-            <input id="password" name="shop_pin" type="text" class="secret-input" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" required>
+            <input id="password" name="shop_pin" type="password" class="secret-input" autocomplete="current-password" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" required>
           </label>
           <button type="submit" id="loginButton" class="btn primary block">دخول</button>
         </form>
@@ -209,7 +209,7 @@
     </form>
   </dialog>
 
-  <script src="boot-26.js"></script>
-  <script type="module" src="app-28.js"></script>
+  <script src="boot.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
