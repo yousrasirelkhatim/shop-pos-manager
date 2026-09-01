@@ -38,6 +38,8 @@ const INVOICE_PAGE = 10;
 let invoiceMonth = '';
 let invoiceDay = '';
 let accountsSummary = null;
+let accountMonth = '';
+let closedMonthArchive = [];
 
 function configured(){
   return SUPABASE_URL && SUPABASE_ANON_KEY
@@ -124,7 +126,7 @@ function eventLabel(event){
 
 function currentAction(cashier){
   if(!cashier)return 'لا يوجد نشاط حديث';
-  if(!cashier.online)return `آخر نشاط: ${eventLabel(cashier)}`;
+  if(!isCashierOnline(cashier))return `آخر نشاط: ${eventLabel(cashier)}`;
   return eventLabel(cashier);
 }
 
@@ -238,16 +240,18 @@ function dayKey(value){
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 
-function summaryFromInvoices(sales){
-  const month=currentMonthKey();
-  const rows=(sales||[]).filter(sale=>!sale.voided && monthKeyFromIso(sale.sold_at)===month);
+function summaryFromInvoices(sales, month){
+  const key=month||currentMonthKey();
+  const rows=(sales||[]).filter(sale=>!sale.voided && monthKeyFromIso(sale.sold_at)===key);
   const days=new Set(rows.map(sale=>dayKey(sale.sold_at)).filter(Boolean));
   const qty=rows.reduce((sum,sale)=>sum+saleQty(sale),0);
   const today=dayKey(new Date());
-  const todayRows=(sales||[]).filter(sale=>!sale.voided && dayKey(sale.sold_at)===today);
+  const todayRows=key===currentMonthKey()
+    ?(sales||[]).filter(sale=>!sale.voided && dayKey(sale.sold_at)===today)
+    :[];
   return {
-    month,
-    month_label:monthLabel(month),
+    month:key,
+    month_label:monthLabel(key),
     sales:rows.reduce((sum,sale)=>sum+Number(sale.total||0),0),
     invoices:rows.length,
     from_invoices:true,
@@ -279,6 +283,20 @@ function matchingShift(cashier){
     || (cashier.employee_id && shift.employee_id===cashier.employee_id && shift.status==='open')
     || (shift.employee_name===cashier.employee_name && shift.status==='open')
   );
+}
+
+function isCashierOnline(cashier){
+  if(!cashier||isShopMetaEvent(cashier))return false;
+  if(cashier.event_type==='logout')return false;
+  if(cashier.online)return true;
+  const ts=Date.parse(cashier.happened_at);
+  if(Number.isFinite(ts) && Date.now()-ts < 5*60*1000) return true;
+  const shift=matchingShift(cashier);
+  return !!(shift && shift.status==='open');
+}
+
+function onlineCount(){
+  return visibleCashiers().filter(isCashierOnline).length;
 }
 
 function filteredShifts(){
@@ -330,7 +348,7 @@ function renderCashiers(){
   list.replaceChildren();
   const cashiers=visibleCashiers()
     .slice()
-    .sort((a,b)=>Number(!!b.online)-Number(!!a.online))
+    .sort((a,b)=>Number(isCashierOnline(b))-Number(isCashierOnline(a)))
     .filter(cashier=>cashierFilter==='all'||matchesCashierFilter(cashier));
   if(!cashiers.length){
     const empty=document.createElement('article');
@@ -347,18 +365,22 @@ function renderCashiers(){
     const total=sales.reduce((sum,sale)=>sum+Number(sale.total||0),0);
     const cart=Number(cashier.details?.itemCount||0);
     const name=cashier.employee_name||'موظف';
+    const online=isCashierOnline(cashier);
     const card=document.createElement('article');
-    card.className=`cashier ${cashier.online?'online':'offline'}${cashierFilter==='all'?'':' active-filter'}`;
+    card.className=`cashier ${online?'online':'offline'}${cashierFilter==='all'?'':' active-filter'}`;
     card.innerHTML=`
       <div class="cashier-head">
         <div class="identity">
-          <div class="avatar">${escapeHtml(name.trim().slice(0,1))}</div>
+          <div class="avatar-wrap">
+            <div class="avatar">${escapeHtml(name.trim().slice(0,1))}</div>
+            <i class="presence"></i>
+          </div>
           <div>
             <h3>${escapeHtml(name)}</h3>
             <p>${cashier.employee_role==='manager'?'مدير':'كاشير'}</p>
           </div>
         </div>
-        <span class="status status-pill">${cashier.online?'متصل':'غير متصل'}</span>
+        <span class="status status-pill">${online?'متصل':'غير متصل'}</span>
       </div>
       <p class="cashier-action">${escapeHtml(currentAction(cashier))}</p>
       ${cart>0?`<span class="cart-flag">السلة: ${cart} أصناف</span>`:''}
@@ -702,12 +724,96 @@ function renderShifts(){
   open.forEach(shift=>openBox.append(shiftCard(shift)));
 }
 
+function invoiceMonthKeys(){
+  return uniqueInvoiceKeys(allInvoices().filter(sale=>!sale.voided), saleMonthKey);
+}
+
+function closedRecordForMonth(month){
+  return (closedMonthArchive||[]).find(item=>item && item.month===month)||null;
+}
+
+function accountMonthKeys(){
+  const keys=new Set(invoiceMonthKeys());
+  keys.add(currentMonthKey());
+  if(accountsSummary&&accountsSummary.month) keys.add(accountsSummary.month);
+  (closedMonthArchive||[]).forEach(item=>{ if(item&&item.month) keys.add(item.month); });
+  return [...keys].sort((a,b)=>b.localeCompare(a));
+}
+
+function pickDefaultAccountMonth(){
+  const invoices=invoiceMonthKeys();
+  if(invoices.length) return invoices[0];
+  const closed=(closedMonthArchive||[]).map(item=>item&&item.month).filter(Boolean).sort((a,b)=>b.localeCompare(a));
+  if(closed.length) return closed[0];
+  return currentMonthKey();
+}
+
+function liveSummaryForMonth(month){
+  const key=month||currentMonthKey();
+  const invoiceStats=summaryFromInvoices(allInvoices(), key);
+  const closed=closedRecordForMonth(key);
+  const live=accountsSummary;
+  const liveMatches=!!(live && live.month===key && !live.from_invoices);
+  const archived=key!==currentMonthKey();
+  if(liveMatches){
+    return {
+      ...invoiceStats,
+      ...live,
+      month:key,
+      month_label:monthLabel(key),
+      from_invoices:false,
+      sales:live.sales!=null?live.sales:invoiceStats.sales,
+      invoices:live.invoices!=null?live.invoices:invoiceStats.invoices,
+      today_qty:live.today_qty!=null?live.today_qty:invoiceStats.today_qty,
+      closed:!!live.closed,
+      archived
+    };
+  }
+  if(closed){
+    return {
+      ...invoiceStats,
+      month:key,
+      month_label:monthLabel(key),
+      sales:closed.revenue!=null?closed.revenue:invoiceStats.sales,
+      profit:closed.profit,
+      purchases:closed.purchases,
+      expenses:closed.expenses,
+      net:closed.net,
+      invoices:closed.invoices||invoiceStats.invoices,
+      days_sold:closed.days||invoiceStats.days_sold,
+      avg_daily:closed.days&&closed.qty?Math.round((closed.qty/closed.days)*10)/10:invoiceStats.avg_daily,
+      today_qty:0,
+      from_invoices:false,
+      closed:true,
+      archived:true,
+      closedBy:closed.closedBy||''
+    };
+  }
+  return {...invoiceStats, archived};
+}
+
+function renderAccountMonths(){
+  const months=accountMonthKeys();
+  if(!accountMonth || !months.includes(accountMonth)) accountMonth=pickDefaultAccountMonth();
+  renderInvoiceTabs($('accountsMonths'), months.map(month=>{
+    const closed=closedRecordForMonth(month);
+    const invoices=allInvoices().filter(sale=>!sale.voided && saleMonthKey(sale)===month).length;
+    const extra=closed?' · أرشيف':(month!==currentMonthKey() && invoices?' · أرشيف':'');
+    return {value:month, label:`${monthLabel(month)}${invoices?` · ${invoices}`:''}${extra}`};
+  }), accountMonth, month=>{
+    accountMonth=month;
+    renderAccountsPanel();
+  });
+}
+
 function renderAccountsPanel(){
   const panel=$('accountsPanel');
   const label=$('accountsMonthLabel');
   if(!panel)return;
-  const summary=accountsSummary;
-  if(label)label.textContent=summary?.month_label||'';
+  renderAccountMonths();
+  const summary=liveSummaryForMonth(accountMonth||currentMonthKey());
+  const archived=!!(summary.archived||summary.closed);
+  if(label)label.textContent=summary?.month_label?(archived?`${summary.month_label} · أرشيف`:summary.month_label):'';
   if(!summary||summary.sales==null&&!summary.month){
     panel.innerHTML='<article class="empty-card">ما في أرقام هذا الشهر بعد. أول ما يحصل بيع على جهاز مربوط، المبيعات تظهر هنا تلقائياً.</article>';
     return;
@@ -724,26 +830,27 @@ function renderAccountsPanel(){
   const fill=Math.min(100,todayQty/maxScale*100);
   const bePos=Math.min(98,Math.max(1,breakEven/maxScale*100));
   const qty=(value,digits=0)=>value==null||value===''?'—':Number(value).toLocaleString('ar-EG',{maximumFractionDigits:digits});
+  const isCurrent=summary.month===currentMonthKey();
   panel.innerHTML=`
     <article class="accounts-hero ${tone}">
       <div>
         <div class="lbl">${snapshot?'صافي الربح الشهري':'إجمالي مبيعات الشهر'}</div>
         <div class="val">${snapshot?money(summary.net):money(summary.sales)}</div>
       </div>
-      <span class="status-pill">${snapshot?toneLabel:`${summary.invoices||0} فاتورة`}</span>
+      <span class="status-pill">${snapshot?toneLabel:`${summary.invoices||0} فاتورة`}${archived?' · أرشيف':''}</span>
     </article>
     <div class="accounts-stats">
       <article class="mini-kpi kpi-card tone-sales"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16l5-5 4 3 7-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>إجمالي المبيعات</span><strong>${money(summary.sales)}</strong></article>
       <article class="mini-kpi kpi-card tone-profit"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M7 8h8a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>ربح المبيعات</span><strong>${snapshot?money(summary.profit):'—'}</strong></article>
       <article class="mini-kpi kpi-card tone-loss"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M7 7l1 13h8l1-13M9 7V5h6v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>المصاريف الثابتة</span><strong>${snapshot?money(summary.expenses):'—'}</strong></article>
       <article class="mini-kpi kpi-card tone-invoices"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 17V8h9v9H4zm9-5h4l3 3v2h-7v-5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7" cy="19.5" r="1.4" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="19.5" r="1.4" stroke="currentColor" stroke-width="1.6"/></svg></div><span>المشتريات</span><strong>${snapshot?money(summary.purchases):'—'}</strong></article>
-      <article class="mini-kpi kpi-card tone-online"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16l5-5 4 3 7-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>البيع اليومي الفعلي</span><strong>${qty(todayQty,1)}</strong></article>
-      <article class="mini-kpi kpi-card tone-target"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></div><span>تارجت اليوم</span><strong>${dayTarget?`${qty(dayTarget)}${daySalesTarget?` · ${money(daySalesTarget)}`:''}`:'—'}</strong></article>
+      <article class="mini-kpi kpi-card tone-online"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16l5-5 4 3 7-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>${isCurrent?'البيع اليومي الفعلي':'متوسط البيع اليومي'}</span><strong>${qty(isCurrent?todayQty:summary.avg_daily,1)}</strong></article>
+      <article class="mini-kpi kpi-card tone-target"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg></div><span>تارجت اليوم</span><strong>${isCurrent&&dayTarget?`${qty(dayTarget)}${daySalesTarget?` · ${money(daySalesTarget)}`:''}`:'—'}</strong></article>
       <article class="mini-kpi kpi-card tone-invoices"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19V6h14v13l-7-3-7 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div><span>تارجت الشهر</span><strong>${snapshot?qty(summary.month_target):'—'}</strong></article>
       <article class="mini-kpi kpi-card tone-shifts"><div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h14M7 16V8m5 8V5m5 11v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><span>نقطة التعادل</span><strong>${snapshot?qty(summary.break_even_day,1):'—'}</strong></article>
     </div>
     ${salesBreakdownHtml()}
-    <div class="meter-wrap">
+    ${isCurrent?`<div class="meter-wrap">
       <p class="muted">اليوم ${Number(todayQty||0).toLocaleString('ar-EG',{maximumFractionDigits:1})} منتج${dayTarget?` / التارجت ${dayTarget}`:''}${daySalesTarget?` · ${money(daySalesTarget)}`:''}</p>
       <svg class="meter-svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
         <rect width="100" height="8" rx="4" fill="#0f172a"></rect>
@@ -751,12 +858,13 @@ function renderAccountsPanel(){
         ${dayTarget?`<rect x="${bePos.toFixed(1)}" y="0" width="1.6" height="8" fill="#fb7185"></rect>`:''}
       </svg>
       <div class="acc-meter-scale"><span>0</span><span>${Math.round(maxScale)}</span></div>
-    </div>
+    </div>`:''}
   `;
 }
 
 function salesBreakdownHtml(){
-  const sales=allInvoices().filter(sale=>!sale.voided);
+  const month=accountMonth||currentMonthKey();
+  const sales=allInvoices().filter(sale=>!sale.voided && saleMonthKey(sale)===month);
   if(!sales.length)return '';
   const cash=sales.filter(sale=>sale.payment==='cash').reduce((sum,sale)=>sum+Number(sale.total||0),0);
   const card=sales.filter(sale=>sale.payment==='card').reduce((sum,sale)=>sum+Number(sale.total||0),0);
@@ -771,7 +879,7 @@ function salesBreakdownHtml(){
   const max=top[0]?top[0][1]:1;
   return `
     <div class="sales-break">
-      <h3>تفصيل المبيعات المرفوعة</h3>
+      <h3>تفصيل مبيعات ${escapeHtml(monthLabel(month))}</h3>
       <div class="accounts-stats">
         <article class="mini-kpi"><span>نقدي</span><strong>${money(cash)}</strong></article>
         <article class="mini-kpi"><span>بطاقة</span><strong>${money(card)}</strong></article>
@@ -797,6 +905,29 @@ function summaryFromRecord(value){
   if(!data||data.from_invoices)return null;
   if(data.kind==='accounts_summary' || (data.month && (data.profit!=null || data.net!=null || data.day_target!=null)))return data;
   return null;
+}
+
+function parseClosedMonths(value){
+  const data=parseDetails(value);
+  if(!data)return [];
+  const acc=data.kind==='shop_accounting' ? data.accounting : (data.accounting || data);
+  const list=acc && Array.isArray(acc.closedMonths) ? acc.closedMonths : [];
+  return list.filter(item=>item && item.month);
+}
+
+async function loadClosedMonths(){
+  for(const row of liveFeed.cashiers||[]){
+    const list=parseClosedMonths(row.details||row);
+    if(list.length)return list;
+  }
+  try{
+    const rows=await request('/rest/v1/activity_events?device_id=eq.__accounting__&select=details&order=happened_at.desc&limit=1');
+    const fromDetails=parseClosedMonths(rows&&rows[0]&&rows[0].details);
+    if(fromDetails.length)return fromDetails;
+    const fromRow=parseClosedMonths(rows&&rows[0]);
+    if(fromRow.length)return fromRow;
+  }catch(_error){}
+  return [];
 }
 
 async function loadAccountsSummary(){
@@ -843,7 +974,7 @@ function renderInsight(){
   const today=liveFeed.today||{};
   const dayTarget=Number(summary.day_target||0);
   const todayQty=Number(summary.today_qty||0);
-  const online=(liveFeed.cashiers||[]).filter(cashier=>cashier.online && !isShopMetaEvent(cashier)).length;
+  const online=onlineCount();
   if(dayTarget && todayQty){
     const diff=Math.round((todayQty-dayTarget)*10)/10;
     el.textContent=diff>=0
@@ -861,13 +992,13 @@ function renderInsight(){
 function renderHomePeek(){
   const live=$('homeLive');
   if(live){
-    const rows=visibleCashiers().slice().sort((a,b)=>Number(!!b.online)-Number(!!a.online)).slice(0,4);
+    const rows=visibleCashiers().slice().sort((a,b)=>Number(isCashierOnline(b))-Number(isCashierOnline(a))).slice(0,4);
     if(!rows.length){
       live.innerHTML='<p class="empty-inline">لا يوجد كاشير ظاهر الآن</p>';
     }else{
       live.innerHTML=rows.map(cashier=>{
         const key=cashierKey(cashier);
-        return `<button type="button" class="live-row ${cashier.online?'online':''}" data-key="${escapeHtml(key)}">
+        return `<button type="button" class="live-row ${isCashierOnline(cashier)?'online':''}" data-key="${escapeHtml(key)}">
           <i class="presence"></i>
           <span class="live-name">${escapeHtml(cashier.employee_name||'موظف')}</span>
           <span class="live-act">${escapeHtml(currentAction(cashier))}</span>
@@ -907,7 +1038,7 @@ function renderFeed(){
   if($('todaySales'))$('todaySales').textContent=money(today.sales_total);
   if($('todayCount'))$('todayCount').textContent=String(today.invoice_count||0);
   if($('openCount'))$('openCount').textContent=String(today.open_shifts||0);
-  if($('onlineCount'))$('onlineCount').textContent=String((liveFeed.cashiers||[]).filter(cashier=>cashier.online && !isShopMetaEvent(cashier)).length);
+  if($('onlineCount'))$('onlineCount').textContent=String(onlineCount());
   const hint=$('historyHint');
   if(hint){
     if(all.invoice_count){
@@ -983,7 +1114,8 @@ async function refresh(){
     const history=await loadHistory();
     liveFeed=mergeHistory(liveFeed, history);
     accountsSummary=await loadAccountsSummary();
-    const invoiceStats=summaryFromInvoices(history.sales);
+    closedMonthArchive=await loadClosedMonths();
+    const invoiceStats=summaryFromInvoices(history.sales, currentMonthKey());
     if(!accountsSummary||accountsSummary.month==null){
       accountsSummary=invoiceStats;
     }else{
@@ -993,6 +1125,9 @@ async function refresh(){
         from_invoices:false,
         today_qty:accountsSummary.today_qty!=null?accountsSummary.today_qty:invoiceStats.today_qty
       };
+    }
+    if(!accountMonth || !accountMonthKeys().includes(accountMonth)){
+      accountMonth=pickDefaultAccountMonth();
     }
     currency=liveFeed.currency||currency;
     if(liveFeed.shop_name)$('shopName').textContent=liveFeed.shop_name;
