@@ -299,6 +299,27 @@ function onlineCount(){
   return visibleCashiers().filter(isCashierOnline).length;
 }
 
+function lastPosEvent(){
+  return visibleCashiers()
+    .slice()
+    .sort((a,b)=>Date.parse(b.happened_at||0)-Date.parse(a.happened_at||0))[0]||null;
+}
+
+function posUploadStale(){
+  const ts=Date.parse(lastPosEvent()?.happened_at);
+  return !Number.isFinite(ts) || Date.now()-ts > 2*60*1000;
+}
+
+function renderPosLink(){
+  const badge=$('liveBadge');
+  if(!badge)return;
+  const stale=posUploadStale();
+  badge.classList.toggle('stale', stale);
+  badge.innerHTML=stale
+    ? '<i class="pulse"></i> الكاشير متوقف'
+    : '<i class="pulse"></i> مباشر';
+}
+
 function filteredShifts(){
   const shifts=liveFeed.shifts||[];
   if(cashierFilter==='all')return shifts;
@@ -1002,6 +1023,13 @@ function renderInsight(){
   const dayTarget=Number(summary.day_target||0);
   const todayQty=Number(summary.today_qty||0);
   const online=onlineCount();
+  const last=lastPosEvent();
+  if(posUploadStale()){
+    el.textContent=last
+      ? `اللوحة شغالة. آخر رفع من الكاشير ${ago(last.happened_at)} — افتحي نظام الكاشير من الاختصار، وتأكدي إن الشارة خضراء «متصل بالسحابة».`
+      : 'اللوحة شغالة. ما في رفع من الكاشير. اربطي السحابة من إعدادات برنامج الكاشير واضغطي مزامنة الآن.';
+    return;
+  }
   if(dayTarget && todayQty){
     const diff=Math.round((todayQty-dayTarget)*10)/10;
     el.textContent=diff>=0
@@ -1066,6 +1094,7 @@ function renderFeed(){
   if($('todayCount'))$('todayCount').textContent=String(today.invoice_count||0);
   if($('openCount'))$('openCount').textContent=String(today.open_shifts||0);
   if($('onlineCount'))$('onlineCount').textContent=String(onlineCount());
+  renderPosLink();
   const hint=$('historyHint');
   if(hint){
     if(all.invoice_count){
