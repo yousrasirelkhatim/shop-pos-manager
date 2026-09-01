@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
-  "notes": "فلتر فواتير المشتريات حسب اليوم والشهر، زي التقارير.",
-  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.2/Shop.POS.Setup.1.4.2.exe"
+  "version": "1.4.3",
+  "notes": "مزامنة المشتريات بين الأجهزة: الجمع بدل استبدال القائمة.",
+  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.3/Shop.POS.Setup.1.4.3.exe"
 }
