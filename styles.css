@@ -132,6 +132,14 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 .live-act,.peek-row p{margin:0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .peek-row{grid-template-columns:1fr auto;cursor:pointer}
 .empty-inline{margin:0;padding:16px;color:var(--muted);font-size:13px}
+.audit-list{display:grid;gap:8px}
+.audit-row{
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  padding:12px 14px;border-radius:16px;background:var(--card)
+}
+.audit-row b{display:block;font-size:13px}
+.audit-row p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+.audit-row span{color:var(--muted);font-size:11px;white-space:nowrap}
 
 .panel{margin-bottom:18px}
 .panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
