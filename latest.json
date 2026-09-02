@@ -1,5 +1,5 @@
 {
-  "version": "1.4.7",
-  "notes": "دمج المنتجات حسب وقت السيرفر، مش ساعة الجهاز.",
-  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.7/Shop.POS.Setup.1.4.7.exe"
+  "version": "1.4.8",
+  "notes": "ملف الموظف: حضور وغياب من فتح وقفل الوردية، ساعات ثم أيام، راتب وسلف لكل موظف.",
+  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.8/Shop.POS.Setup.1.4.8.exe"
 }
