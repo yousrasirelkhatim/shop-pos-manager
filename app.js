@@ -40,6 +40,7 @@ let invoiceDay = '';
 let accountsSummary = null;
 let accountMonth = '';
 let closedMonthArchive = [];
+let serverMonthSummaries = {};
 
 function configured(){
   return SUPABASE_URL && SUPABASE_ANON_KEY
@@ -773,20 +774,19 @@ function liveSummaryForMonth(month){
   const key=month||currentMonthKey();
   const invoiceStats=summaryFromInvoices(allInvoices(), key);
   const closed=closedRecordForMonth(key);
-  const live=accountsSummary;
-  const liveMatches=!!(live && live.month===key && !live.from_invoices);
-  const archived=key!==currentMonthKey();
-  if(liveMatches){
+  const server=serverMonthSummaries[key];
+  const archived=key!==currentMonthKey() || !!(server&&server.closed) || !!closed;
+  if(server && server.source==='server' && server.month===key){
     return {
       ...invoiceStats,
-      ...live,
+      ...server,
       month:key,
       month_label:monthLabel(key),
       from_invoices:false,
-      sales:live.sales!=null?live.sales:invoiceStats.sales,
-      invoices:live.invoices!=null?live.invoices:invoiceStats.invoices,
-      today_qty:live.today_qty!=null?live.today_qty:invoiceStats.today_qty,
-      closed:!!live.closed,
+      sales:server.sales!=null?server.sales:invoiceStats.sales,
+      invoices:server.invoices!=null?server.invoices:invoiceStats.invoices,
+      today_qty:server.today_qty!=null?server.today_qty:invoiceStats.today_qty,
+      closed:!!server.closed,
       archived
     };
   }
@@ -821,8 +821,9 @@ function renderAccountMonths(){
     const invoices=allInvoices().filter(sale=>!sale.voided && saleMonthKey(sale)===month).length;
     const extra=closed?' · أرشيف':(month!==currentMonthKey() && invoices?' · أرشيف':'');
     return {value:month, label:`${monthLabel(month)}${invoices?` · ${invoices}`:''}${extra}`};
-  }), accountMonth, month=>{
+  }), accountMonth, async month=>{
     accountMonth=month;
+    await loadServerMonth(month);
     renderAccountsPanel();
   });
 }
@@ -964,6 +965,23 @@ function parseClosedMonths(value){
 }
 
 async function loadClosedMonths(){
+  try{
+    const rows=await request('/rest/v1/accounting_months?select=month,closed_at,closed_by,invoices,revenue,profit,purchases,expenses,net,days,qty,reopened&reopened=eq.false&order=month.desc');
+    const fromTable=(rows||[]).filter(row=>row&&row.month&&row.closed_at).map(row=>({
+      month:row.month,
+      closedAt:row.closed_at,
+      closedBy:row.closed_by||'',
+      invoices:Number(row.invoices)||0,
+      revenue:Number(row.revenue)||0,
+      profit:Number(row.profit)||0,
+      purchases:Number(row.purchases)||0,
+      expenses:Number(row.expenses)||0,
+      net:Number(row.net)||0,
+      days:Number(row.days)||0,
+      qty:Number(row.qty)||0
+    }));
+    if(fromTable.length)return fromTable;
+  }catch(_error){}
   for(const row of liveFeed.cashiers||[]){
     const list=parseClosedMonths(row.details||row);
     if(list.length)return list;
@@ -978,29 +996,26 @@ async function loadClosedMonths(){
   return [];
 }
 
+async function loadServerMonth(month){
+  const key=month||currentMonthKey();
+  try{
+    const data=await request('/rest/v1/rpc/manager_accounts_month',{
+      method:'POST',
+      body:JSON.stringify({p_month:key})
+    });
+    if(data && data.month && data.source==='server'){
+      serverMonthSummaries[data.month]=data;
+      return data;
+    }
+  }catch(_error){}
+  return serverMonthSummaries[key]||null;
+}
+
 async function loadAccountsSummary(){
-  const fromLive=(liveFeed.cashiers||[]).map(summaryFromRecord).find(Boolean);
-  if(fromLive)return fromLive;
-  const paths=[
-    '/rest/v1/activity_events?device_id=eq.__accounts__&select=details,happened_at&order=happened_at.desc&limit=5',
-    '/rest/v1/activity_events?view_name=eq.accounts&select=details,happened_at&order=happened_at.desc&limit=10',
-    '/rest/v1/profiles?select=shops(accounts_summary)'
-  ];
-  for(const path of paths){
-    try{
-      const rows=await request(path);
-      if(path.includes('profiles')){
-        const summary=summaryFromRecord(rows&&rows[0]&&rows[0].shops&&rows[0].shops.accounts_summary);
-        if(summary)return summary;
-        continue;
-      }
-      for(const row of rows||[]){
-        const summary=summaryFromRecord(row);
-        if(summary)return summary;
-      }
-    }catch(_error){}
-  }
-  return summaryFromRecord(liveFeed.accounts_summary);
+  const current=currentMonthKey();
+  const server=await loadServerMonth(current);
+  if(server)return server;
+  return summaryFromInvoices(allInvoices(), current);
 }
 
 function setDashView(view){
@@ -1169,16 +1184,17 @@ async function refresh(){
     liveFeed=await request('/rest/v1/rpc/manager_live_feed',{method:'POST',body:'{}'});
     const history=await loadHistory();
     liveFeed=mergeHistory(liveFeed, history);
-    accountsSummary=await loadAccountsSummary();
+    serverMonthSummaries={};
     closedMonthArchive=await loadClosedMonths();
+    accountsSummary=await loadAccountsSummary();
+    if(accountMonth && accountMonth!==currentMonthKey()) await loadServerMonth(accountMonth);
     const invoiceStats=summaryFromInvoices(history.sales, currentMonthKey());
     if(!accountsSummary||accountsSummary.month==null){
       accountsSummary=invoiceStats;
-    }else{
+    }else if(accountsSummary.source!=='server'){
       accountsSummary={
         ...invoiceStats,
         ...accountsSummary,
-        from_invoices:false,
         today_qty:accountsSummary.today_qty!=null?accountsSummary.today_qty:invoiceStats.today_qty
       };
     }
