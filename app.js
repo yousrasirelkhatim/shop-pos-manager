@@ -25,6 +25,16 @@ const EVENT_LABELS = {
   cash_movement: 'حرّك الدرج',
   shift_closed: 'أغلق الوردية'
 };
+const AUDIT_LABELS = {
+  close_shift: 'إغلاق وردية عن بُعد',
+  close_shift_pos: 'إغلاق وردية من الجهاز',
+  close_month: 'إقفال شهر',
+  reopen_month: 'إعادة فتح شهر',
+  price_change: 'تعديل سعر',
+  product_delete: 'حذف صنف',
+  void_sale: 'إلغاء فاتورة',
+  void_purchase: 'إلغاء مشترى'
+};
 
 let session = null;
 let selectedShift = null;
@@ -41,6 +51,7 @@ let accountsSummary = null;
 let accountMonth = '';
 let closedMonthArchive = [];
 let serverMonthSummaries = {};
+let shopAudit = [];
 
 function configured(){
   return SUPABASE_URL && SUPABASE_ANON_KEY
@@ -729,6 +740,54 @@ function shiftCard(shift){
   return card;
 }
 
+function auditLabel(row){
+  return AUDIT_LABELS[row?.action]||row?.action||'إجراء';
+}
+
+function auditDetail(row){
+  const d=row?.details||{};
+  if(row.action==='price_change'){
+    return `${d.name||d.product_id||'صنف'}: ${money(d.from_price)} ← ${money(d.to_price)}`;
+  }
+  if(row.action==='product_delete') return d.name||d.product_id||'صنف';
+  if(row.action==='close_shift'||row.action==='close_shift_pos'){
+    return `${d.employee_name||'موظف'}${d.reason?` — ${d.reason}`:''}`;
+  }
+  if(row.action==='close_month'||row.action==='reopen_month') return d.month||'';
+  if(row.action==='void_sale') return `فاتورة ${d.invoice_no||d.source_id||''}`.trim();
+  if(row.action==='void_purchase') return `مشترى ${d.invoice_no||d.source_id||''}`.trim();
+  return row.actor_name||'';
+}
+
+async function loadAudit(){
+  try{
+    const rows=await request('/rest/v1/rpc/manager_audit_feed',{
+      method:'POST',
+      body:JSON.stringify({p_limit:80})
+    });
+    shopAudit=Array.isArray(rows)?rows:[];
+  }catch(_error){
+    shopAudit=[];
+  }
+}
+
+function renderAudit(){
+  const box=$('auditList');
+  if(!box)return;
+  if(!shopAudit.length){
+    box.innerHTML='<p class="empty-inline">ما في إجراءات إدارية مسجّلة بعد. تظهر هنا بعد إغلاق وردية أو تعديل سعر أو إلغاء.</p>';
+    return;
+  }
+  box.innerHTML=shopAudit.map(row=>`
+    <article class="audit-row">
+      <div>
+        <b>${escapeHtml(auditLabel(row))}</b>
+        <p>${escapeHtml(auditDetail(row))}</p>
+      </div>
+      <span>${escapeHtml(ago(row.created_at)||'')}</span>
+    </article>`).join('');
+}
+
 function renderShifts(){
   const openBox=$('openShifts');
   const shifts=filteredShifts();
@@ -1121,6 +1180,7 @@ function renderFeed(){
   renderCashierFilter();
   renderCashiers();
   renderShifts();
+  renderAudit();
   renderAccountsPanel();
   renderInvoices();
   renderHomePeek();
@@ -1185,6 +1245,7 @@ async function refresh(){
     liveFeed=mergeHistory(liveFeed, history);
     serverMonthSummaries={};
     closedMonthArchive=await loadClosedMonths();
+    await loadAudit();
     accountsSummary=await loadAccountsSummary();
     if(accountMonth && accountMonth!==currentMonthKey()) await loadServerMonth(accountMonth);
     const invoiceStats=summaryFromInvoices(history.sales, currentMonthKey());
