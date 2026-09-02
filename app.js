@@ -243,7 +243,7 @@ function monthKeyFromIso(value){
 
 function saleQty(sale){
   if(sale?.item_qty!=null && sale.item_qty!=='') return Number(sale.item_qty)||0;
-  return (sale.items||[]).reduce((sum,item)=>sum+Number(item.quantity||0),0);
+  return (sale.items||[]).reduce((sum,item)=>sum+Number(item.quantity||item.qty||0),0);
 }
 
 function dayKey(value){
@@ -259,7 +259,9 @@ function summaryFromInvoices(sales, month){
   const qty=rows.reduce((sum,sale)=>sum+saleQty(sale),0);
   const today=dayKey(new Date());
   const todayRows=key===currentMonthKey()
-    ?(sales||[]).filter(sale=>!sale.voided && dayKey(sale.sold_at)===today)
+    ?(sales||[]).filter(sale=>!sale.voided && (
+      dayKey(sale.sold_at)===today || sale.shift_status==='open'
+    ))
     :[];
   return {
     month:key,
@@ -269,6 +271,7 @@ function summaryFromInvoices(sales, month){
     from_invoices:true,
     avg_daily:days.size?Math.round((qty/days.size)*10)/10:0,
     today_qty:todayRows.reduce((sum,sale)=>sum+saleQty(sale),0),
+    today_invoices:todayRows.length,
     days_sold:days.size
   };
 }
@@ -843,7 +846,8 @@ function liveSummaryForMonth(month){
       from_invoices:false,
       sales:server.sales!=null?server.sales:invoiceStats.sales,
       invoices:server.invoices!=null?server.invoices:invoiceStats.invoices,
-      today_qty:server.today_qty!=null?server.today_qty:invoiceStats.today_qty,
+      today_qty:Math.max(Number(server.today_qty)||0, Number(invoiceStats.today_qty)||0),
+      today_invoices:Math.max(Number(server.today_invoices)||0, Number(invoiceStats.today_invoices)||0),
       closed:!!server.closed,
       archived
     };
@@ -905,6 +909,7 @@ function renderAccountsPanel(){
   const dayTarget=Number(summary.day_target||0);
   const daySalesTarget=Number(summary.day_sales_target||0);
   const todayQty=Number(summary.today_qty!=null?summary.today_qty:summary.avg_daily||0);
+  const todayInvoices=Number(summary.today_invoices||0);
   const breakEven=Number(summary.break_even_day||0);
   const maxScale=Math.max(todayQty,dayTarget,breakEven,1)*1.35;
   const fill=Math.min(100,todayQty/maxScale*100);
@@ -931,7 +936,7 @@ function renderAccountsPanel(){
     </div>
     ${salesBreakdownHtml()}
     ${isCurrent?`<div class="meter-wrap">
-      <p class="muted">اليوم ${Number(todayQty||0).toLocaleString('ar-EG',{maximumFractionDigits:1})} منتج${dayTarget?` / التارجت ${dayTarget}`:''}${daySalesTarget?` · ${money(daySalesTarget)}`:''}</p>
+      <p class="muted">اليوم ${Number(todayQty||0).toLocaleString('ar-EG',{maximumFractionDigits:1})} منتج${todayInvoices?` · ${todayInvoices} فاتورة`:''}${dayTarget?` / التارجت ${dayTarget}`:''}${daySalesTarget?` · ${money(daySalesTarget)}`:''}</p>
       <svg class="meter-svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
         <rect width="100" height="8" rx="4" fill="#0f172a"></rect>
         <rect width="${fill.toFixed(1)}" height="8" rx="4" fill="#2dd4bf"></rect>
