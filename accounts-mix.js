@@ -64,6 +64,44 @@ function itemQty(item) {
   return Number(item && (item.quantity != null ? item.quantity : item.qty) || 0);
 }
 
+function salePieceCount(sale) {
+  const items = sale && sale.items;
+  if (Array.isArray(items) && items.length) {
+    return items.reduce((sum, item) => sum + itemQty(item), 0);
+  }
+  if (sale && sale.item_qty != null && sale.item_qty !== '') return Number(sale.item_qty) || 0;
+  return 0;
+}
+
+function mergeSaleLists(primary, extra) {
+  const byId = new Map();
+  for (const sale of extra || []) {
+    if (sale && sale.source_id != null && sale.source_id !== '') {
+      byId.set(String(sale.source_id), sale);
+    }
+  }
+  const seen = new Set();
+  const out = [];
+  for (const sale of primary || []) {
+    const id = sale && sale.source_id != null && sale.source_id !== '' ? String(sale.source_id) : '';
+    const hist = id ? byId.get(id) : null;
+    if (id) seen.add(id);
+    if (!hist) {
+      out.push(sale);
+      continue;
+    }
+    const items = (sale.items && sale.items.length) ? sale.items : (hist.items || []);
+    const merged = { ...hist, ...sale, items };
+    merged.item_qty = salePieceCount(merged);
+    out.push(merged);
+  }
+  for (const sale of extra || []) {
+    const id = sale && sale.source_id != null && sale.source_id !== '' ? String(sale.source_id) : '';
+    if (id && !seen.has(id)) out.push(sale);
+  }
+  return out;
+}
+
 function itemTotal(item) {
   if (item && item.line_total != null && item.line_total !== '') return Number(item.line_total) || 0;
   return itemQty(item) * (Number(item && item.price) || 0);
@@ -113,6 +151,11 @@ function monthOutlook(sales, monthKey) {
   (sales || []).forEach(sale => {
     if (!sale || sale.voided) return;
     revenue += Number(sale.total || 0);
+    const stamp = sale.sold_at instanceof Date ? sale.sold_at : new Date(sale.sold_at || '');
+    if (!Number.isNaN(stamp.getTime())) {
+      days.add(`${stamp.getFullYear()}-${String(stamp.getMonth() + 1).padStart(2, '0')}-${String(stamp.getDate()).padStart(2, '0')}`);
+      return;
+    }
     const day = String(sale.sold_at || '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(day)) days.add(day);
   });
@@ -138,6 +181,9 @@ const AccountsMix = {
   monthLabel,
   daysInMonth,
   nextMonthKey,
+  itemQty,
+  salePieceCount,
+  mergeSaleLists,
   monthProductMix,
   monthOutlook
 };
