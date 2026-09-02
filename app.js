@@ -289,11 +289,10 @@ function matchingShift(cashier){
 function isCashierOnline(cashier){
   if(!cashier||isShopMetaEvent(cashier))return false;
   if(cashier.event_type==='logout')return false;
-  if(cashier.online)return true;
+  if(cashier.online===true)return true;
+  if(cashier.online===false)return false;
   const ts=Date.parse(cashier.happened_at);
-  if(Number.isFinite(ts) && Date.now()-ts < 5*60*1000) return true;
-  const shift=matchingShift(cashier);
-  return !!(shift && shift.status==='open');
+  return Number.isFinite(ts) && Date.now()-ts < 4*60*1000;
 }
 
 function onlineCount(){
