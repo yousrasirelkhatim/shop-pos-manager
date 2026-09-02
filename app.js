@@ -83,6 +83,18 @@ async function request(path, options={}, retry=true){
   return response.json();
 }
 
+async function requestPages(path, pageSize=1000, maxRows=5000){
+  const rows=[];
+  for(let from=0; from<maxRows; from+=pageSize){
+    const to=from+pageSize-1;
+    const page=await request(path,{headers:{Range:`${from}-${to}`}});
+    const list=Array.isArray(page)?page:[];
+    rows.push(...list);
+    if(list.length<pageSize) break;
+  }
+  return rows;
+}
+
 async function refreshSession(){
   const response=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
     method:'POST',
@@ -242,8 +254,13 @@ function monthKeyFromIso(value){
 }
 
 function saleQty(sale){
+  const Mix=typeof window!=='undefined'?window.AccountsMix:null;
+  if(Mix&&Mix.salePieceCount) return Mix.salePieceCount(sale);
+  if(Array.isArray(sale?.items)&&sale.items.length){
+    return sale.items.reduce((sum,item)=>sum+Number(item.quantity||item.qty||0),0);
+  }
   if(sale?.item_qty!=null && sale.item_qty!=='') return Number(sale.item_qty)||0;
-  return (sale.items||[]).reduce((sum,item)=>sum+Number(item.quantity||item.qty||0),0);
+  return 0;
 }
 
 function dayKey(value){
@@ -258,11 +275,11 @@ function summaryFromInvoices(sales, month){
   const days=new Set(rows.map(sale=>dayKey(sale.sold_at)).filter(Boolean));
   const qty=rows.reduce((sum,sale)=>sum+saleQty(sale),0);
   const today=dayKey(new Date());
+  const yesterday=dayKey(new Date(Date.now()-86400000));
   const todayRows=key===currentMonthKey()
-    ?(sales||[]).filter(sale=>!sale.voided && (
-      dayKey(sale.sold_at)===today || sale.shift_status==='open'
-    ))
+    ?(sales||[]).filter(sale=>!sale.voided && dayKey(sale.sold_at)===today)
     :[];
+  const yesterdayRows=(sales||[]).filter(sale=>!sale.voided && dayKey(sale.sold_at)===yesterday);
   return {
     month:key,
     month_label:monthLabel(key),
@@ -272,6 +289,8 @@ function summaryFromInvoices(sales, month){
     avg_daily:days.size?Math.round((qty/days.size)*10)/10:0,
     today_qty:todayRows.reduce((sum,sale)=>sum+saleQty(sale),0),
     today_invoices:todayRows.length,
+    yesterday_qty:yesterdayRows.reduce((sum,sale)=>sum+saleQty(sale),0),
+    yesterday_invoices:yesterdayRows.length,
     days_sold:days.size
   };
 }
@@ -846,8 +865,10 @@ function liveSummaryForMonth(month){
       from_invoices:false,
       sales:server.sales!=null?server.sales:invoiceStats.sales,
       invoices:server.invoices!=null?server.invoices:invoiceStats.invoices,
-      today_qty:Math.max(Number(server.today_qty)||0, Number(invoiceStats.today_qty)||0),
-      today_invoices:Math.max(Number(server.today_invoices)||0, Number(invoiceStats.today_invoices)||0),
+      today_qty:server.today_qty!=null?Number(server.today_qty)||0:invoiceStats.today_qty,
+      today_invoices:server.today_invoices!=null?Number(server.today_invoices)||0:invoiceStats.today_invoices,
+      yesterday_qty:server.yesterday_qty!=null?Number(server.yesterday_qty)||0:invoiceStats.yesterday_qty,
+      yesterday_invoices:server.yesterday_invoices!=null?Number(server.yesterday_invoices)||0:invoiceStats.yesterday_invoices,
       closed:!!server.closed,
       archived
     };
@@ -866,6 +887,7 @@ function liveSummaryForMonth(month){
       days_sold:closed.days||invoiceStats.days_sold,
       avg_daily:closed.days&&closed.qty?Math.round((closed.qty/closed.days)*10)/10:invoiceStats.avg_daily,
       today_qty:0,
+      yesterday_qty:0,
       from_invoices:false,
       closed:true,
       archived:true,
@@ -910,6 +932,8 @@ function renderAccountsPanel(){
   const daySalesTarget=Number(summary.day_sales_target||0);
   const todayQty=Number(summary.today_qty!=null?summary.today_qty:summary.avg_daily||0);
   const todayInvoices=Number(summary.today_invoices||0);
+  const yesterdayQty=Number(summary.yesterday_qty||0);
+  const yesterdayInvoices=Number(summary.yesterday_invoices||0);
   const breakEven=Number(summary.break_even_day||0);
   const maxScale=Math.max(todayQty,dayTarget,breakEven,1)*1.35;
   const fill=Math.min(100,todayQty/maxScale*100);
@@ -936,7 +960,7 @@ function renderAccountsPanel(){
     </div>
     ${salesBreakdownHtml()}
     ${isCurrent?`<div class="meter-wrap">
-      <p class="muted">اليوم ${Number(todayQty||0).toLocaleString('ar-EG',{maximumFractionDigits:1})} منتج${todayInvoices?` · ${todayInvoices} فاتورة`:''}${dayTarget?` / التارجت ${dayTarget}`:''}${daySalesTarget?` · ${money(daySalesTarget)}`:''}</p>
+      <p class="muted">اليوم ${Number(todayQty||0).toLocaleString('ar-EG',{maximumFractionDigits:1})} منتج${todayInvoices?` · ${todayInvoices} فاتورة`:''}${yesterdayQty||yesterdayInvoices?` · أمس ${Number(yesterdayQty||0).toLocaleString('ar-EG',{maximumFractionDigits:1})} منتج${yesterdayInvoices?` · ${yesterdayInvoices} فاتورة`:''}`:''}${dayTarget?` / التارجت ${dayTarget}`:''}${daySalesTarget?` · ${money(daySalesTarget)}`:''}</p>
       <svg class="meter-svg" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
         <rect width="100" height="8" rx="4" fill="#0f172a"></rect>
         <rect width="${fill.toFixed(1)}" height="8" rx="4" fill="#2dd4bf"></rect>
@@ -1194,9 +1218,9 @@ function renderFeed(){
 async function loadHistory(){
   try{
     const [sales, items, shifts]=await Promise.all([
-      request('/rest/v1/sales?select=id,source_id,shift_source_id,invoice_no,subtotal,discount,tax,total,payment,paid,change_due,employee_id,employee_name,sold_at,voided,voided_by,void_reason&order=sold_at.desc&limit=300'),
-      request('/rest/v1/sale_items?select=sale_source_id,name,price,quantity,line_total&limit=3000'),
-      request('/rest/v1/shifts?select=id,source_id,employee_id,employee_name,opened_at,open_cash,closed_at,status,close_mode,expected_cash&order=opened_at.desc&limit=100')
+      requestPages('/rest/v1/sales?select=id,source_id,shift_source_id,invoice_no,subtotal,discount,tax,total,payment,paid,change_due,employee_id,employee_name,sold_at,voided,voided_by,void_reason&order=sold_at.desc', 500, 2000),
+      requestPages('/rest/v1/sale_items?select=sale_source_id,name,price,quantity,line_total', 1000, 8000),
+      requestPages('/rest/v1/shifts?select=id,source_id,employee_id,employee_name,opened_at,open_cash,closed_at,status,close_mode,expected_cash&order=opened_at.desc', 100, 400)
     ]);
     const itemsBySale={};
     (items||[]).forEach(item=>{
@@ -1225,13 +1249,34 @@ async function loadHistory(){
 }
 
 function mergeHistory(feed, history){
-  const byKey=new Map((feed.shifts||[]).map(shift=>[shift.source_id||shift.id, shift]));
+  const Mix=typeof window!=='undefined'?window.AccountsMix:null;
+  const mergeLists=Mix&&Mix.mergeSaleLists
+    ?Mix.mergeSaleLists
+    :(a,b)=>[...(a||[]),...((b||[]).filter(sale=>!(a||[]).some(live=>live&&sale&&live.source_id&&live.source_id===sale.source_id)))];
+  const histByShift=new Map((history.shifts||[]).map(shift=>[shift.source_id||shift.id, shift]));
+  const byKey=new Map();
+  for(const shift of feed.shifts||[]){
+    const key=shift.source_id||shift.id;
+    const hist=histByShift.get(key);
+    byKey.set(key, {
+      ...(hist||{}),
+      ...shift,
+      sales:mergeLists(shift.sales, hist&&hist.sales)
+    });
+  }
   for(const shift of history.shifts||[]){
     const key=shift.source_id||shift.id;
     if(!byKey.has(key)) byKey.set(key, shift);
-    else if(!(byKey.get(key).sales||[]).length && (shift.sales||[]).length){
-      byKey.get(key).sales=shift.sales;
+  }
+  const seen=new Set();
+  for(const shift of byKey.values()){
+    for(const sale of shift.sales||[]){
+      if(sale&&sale.source_id) seen.add(String(sale.source_id));
     }
+  }
+  const leftover=(history.sales||[]).filter(sale=>sale&&sale.source_id&&!seen.has(String(sale.source_id)));
+  if(leftover.length){
+    byKey.set('__history__', {source_id:'__history__', employee_name:'', status:'closed', sales:leftover});
   }
   feed.shifts=[...byKey.values()];
   const active=(history.sales||[]).filter(sale=>!sale.voided);
@@ -1260,7 +1305,8 @@ async function refresh(){
       accountsSummary={
         ...invoiceStats,
         ...accountsSummary,
-        today_qty:accountsSummary.today_qty!=null?accountsSummary.today_qty:invoiceStats.today_qty
+        today_qty:accountsSummary.today_qty!=null?accountsSummary.today_qty:invoiceStats.today_qty,
+        yesterday_qty:accountsSummary.yesterday_qty!=null?accountsSummary.yesterday_qty:invoiceStats.yesterday_qty
       };
     }
     if(!accountMonth || !accountMonthKeys().includes(accountMonth)){
