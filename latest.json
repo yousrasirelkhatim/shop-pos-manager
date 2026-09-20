@@ -1,5 +1,5 @@
 {
-  "version": "1.4.16",
-  "notes": "صفحة لكل موظف: راتب وسلفيات وحضور مربوط بفتح الوردية، ومبيعات الموظف ظاهرة في ملفه.",
-  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.16/Shop.POS.Setup.1.4.16.exe"
+  "version": "1.4.17",
+  "notes": "دمج الموظفين المكررين: مازن ومنة يظهرون مرة واحدة، والمبيعات القديمة تتجمع في نفس الملف.",
+  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.17/Shop.POS.Setup.1.4.17.exe"
 }
