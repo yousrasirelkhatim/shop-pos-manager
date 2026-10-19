@@ -1,5 +1,5 @@
 {
-  "version": "1.4.20",
-  "notes": "مزامنة الرواتب والحضور والسلف بين الأجهزة.",
-  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.20/Shop.POS.Setup.1.4.20.exe"
+  "version": "1.4.21",
+  "notes": "منع امتلاء السحابة: النبض صف واحد لكل جهاز.",
+  "downloadUrl": "https://github.com/yousrasirelkhatim/shop-pos-manager/releases/download/v1.4.21/Shop.POS.Setup.1.4.21.exe"
 }
